@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+venv/
+plan-reminder/venv/
+*.exe
+*.wav
+.git
