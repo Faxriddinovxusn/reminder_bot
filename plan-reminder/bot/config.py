@@ -14,7 +14,7 @@ GROQ_API_KEYS = [
 # Fallback: if no numbered keys set, use the single GROQ_API_KEY
 if not GROQ_API_KEYS and GROQ_API_KEY:
     GROQ_API_KEYS = [GROQ_API_KEY]
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+MONGODB_URI = os.getenv("MONGODB_URI", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 DB_NAME = os.getenv("MONGODB_DB", "plan_reminder")
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://your-project.up.railway.app")
