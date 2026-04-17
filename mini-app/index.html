@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+    window.onerror = function(msg, src, line, col, err) {
+        document.body.innerHTML += '<div style="background:red;color:white;padding:10px;font-size:12px;position:fixed;top:0;left:0;right:0;z-index:9999">' + msg + ' (line ' + line + ')</div>';
+        return false;
+    };
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan Reminder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="header-title">Plan Reminder</h1>
+            <div class="header-actions">
+                <button class="btn-icon" id="refreshBtn" style="display: none;">🔄</button>
+                <button class="btn-icon" id="settingsBtn">⚙️</button>
+            </div>
+        </header>
+
+        <!-- Offline Banner -->
+        <div id="offlineBanner" style="display: none; background-color: #fef2f2; color: #dc2626; padding: 8px; text-align: center; font-size: 14px; font-weight: 500; border-bottom: 1px solid #fee2e2; transition: all 0.3s ease;">
+            Offline rejim 📴
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel" id="settingsPanel" style="display: none;">
+            <div class="settings-title">Language</div>
+            <div class="settings-lang-buttons">
+                <button class="lang-btn" data-lang="uz">🇺🇿 O'zbek</button>
+                <button class="lang-btn" data-lang="ru">🇷🇺 Русский</button>
+                <button class="lang-btn" data-lang="en">🇬🇧 English</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Tasks Tab -->
+            <div class="tab-content active" id="tasksTab">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="taskInput" 
+                        placeholder="Add new task..." 
+                        class="task-input"
+                    >
+                    <button id="addTaskBtn" class="btn-primary">+</button>
+                </div>
+
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="active">Active</button>
+                    <button class="filter-btn" data-filter="done">Done</button>
+                </div>
+
+                <div class="tasks-list" id="tasksList">
+                    <!-- Tasks will be rendered here -->
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+
+            <!-- Future Days Tab -->
+            <div class="tab-content" id="futureTab">
+                <div class="future-list" id="futureList">
+                    <!-- Future days will be rendered here -->
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+
+            <!-- Notes Tab -->
+            <div class="tab-content" id="notesTab">
+                <div class="notes-actions">
+                    <button id="addNoteBtn" class="btn-primary">+ Add Note</button>
+                </div>
+                <div class="notes-list" id="notesList">
+                    <!-- Notes will be rendered here -->
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+
+            <!-- Archive Tab -->
+            <div class="tab-content" id="archiveTab">
+                <div class="archive-list" id="archiveList">
+                    <!-- Archive will be rendered here -->
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+
+            <!-- Stats Tab -->
+            <div class="tab-content" id="statsTab">
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-label">This Week</div>
+                        <div class="stat-value" id="weekStats">0/0</div>
+                        <div class="stat-bar">
+                            <div class="stat-bar-fill" id="weekBar"></div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-label">🔥 Streak</div>
+                        <div class="stat-value" id="streakStats">0 days</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-label">📅 Best Day</div>
+                        <div class="stat-value" id="bestDayStats">—</div>
+                    </div>
+
+                    <div class="stat-card full-width">
+                        <div class="stat-label">Daily Progress</div>
+                        <div class="chart" id="chart">
+                            <!-- Chart bars will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-btn active" data-tab="tasksTab">📋 Bugun</button>
+            <button class="nav-btn" data-tab="futureTab">📅 Kelasi</button>
+            <button class="nav-btn" data-tab="notesTab">📝 Notes</button>
+            <button class="nav-btn" data-tab="archiveTab">📦 Arxiv</button>
+            <button class="nav-btn" data-tab="statsTab">📊 Stats</button>
+        </nav>
+    </div>
+
+    <!-- Modals -->
+    <!-- Task Options Modal -->
+    <div class="modal" id="taskOptionsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Task Options</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="option-group">
+                    <label id="taskTitleLabel">Title</label>
+                    <input type="text" id="taskTitleEditInput" class="task-input">
+                </div>
+                <div class="option-group">
+                    <label>Priority</label>
+                    <div class="priority-buttons">
+                        <button class="priority-btn" data-priority="high">🔴 High</button>
+                        <button class="priority-btn" data-priority="normal">🟡 Normal</button>
+                        <button class="priority-btn" data-priority="low">🟢 Low</button>
+                    </div>
+                </div>
+                <div class="option-group">
+                    <label>Time</label>
+                    <input type="time" id="taskTimeInput" class="time-input">
+                </div>
+                <div class="option-group" style="display: flex; gap: 8px;">
+                    <button id="saveTaskBtn" class="btn-primary" style="flex: 2;">💾 Save Task</button>
+                    <button id="deleteTaskBtn" class="btn-danger" style="flex: 1;">🗑 Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note Editor Modal -->
+    <div class="modal" id="noteEditorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Note</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input 
+                    type="text" 
+                    id="noteTitleInput" 
+                    placeholder="Note title" 
+                    class="note-title-input"
+                >
+                <textarea 
+                    id="noteContentInput" 
+                    placeholder="Note content..." 
+                    class="note-content-input"
+                ></textarea>
+                <button id="saveNoteBtn" class="btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="modalOverlay"></div>
+
+    <!-- Floating AI Button -->
+    <button class="floating-ai-btn" id="floatingAiBtn" title="AI Assistant">💬</button>
+
+    <!-- AI Chat Panel -->
+    <div class="ai-chat-panel" id="aiChatPanel">
+        <div class="ai-header">
+            <h3>Plan Reminder AI 🤖</h3>
+            <button class="ai-close-btn" id="aiCloseBtn">&times;</button>
+        </div>
+        <div class="ai-messages" id="aiMessages">
+            <!-- Messages will be rendered here -->
+        </div>
+        <div class="ai-input-group">
+            <button class="ai-voice-btn" id="aiVoiceBtn" title="Voice input">🎤</button>
+            <input 
+                type="text" 
+                id="aiInput" 
+                placeholder="Ask me about your tasks..."
+                class="ai-input"
+            >
+            <button class="ai-send-btn" id="aiSendBtn">Send</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="api.js"></script>
+    <script src="app.js"></script>
+    <script src="ai-chat.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(r => console.log('SW registered'))
+                    .catch(e => console.error('SW failed', e));
+
+                navigator.serviceWorker.addEventListener('message', (event) => {
+                    if (event.data?.type === 'OFFLINE_MODE') {
+                        if (typeof showToast === 'function') showToast('Internet yo\'q. Ma\'lumot saqlanmadi 📶', 'error');
+                    }
+                });
+            });
+        }
+
+        window.addEventListener('online', () => {
+            if (typeof showToast === 'function') showToast('Back online! 🔄', 'success');
+            if (typeof loadAndRenderTasks === 'function') loadAndRenderTasks();
+        });
+
+        window.addEventListener('offline', () => {
+            if (typeof showToast === 'function') showToast('Internet yo\'q 📶', 'error');
+        });
+    </script>
+</body>
+</html>

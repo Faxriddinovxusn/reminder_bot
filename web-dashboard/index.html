@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="uz" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlanAI — Dashboard</title>
+    <meta name="description" content="PlanAI — Shaxsiy samaradorlik va rejalarni boshqarish platformasi">
+    <link rel="stylesheet" href="./style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <!-- ========== LOGIN SCREEN ========== -->
+    <div id="login-screen" class="screen active">
+        <div class="login-wrapper">
+            <div class="login-card">
+                <div class="login-logo">
+                    <div class="logo-icon"><i class="fas fa-brain"></i></div>
+                    <h1>PlanAI</h1>
+                    <p class="login-subtitle">Shaxsiy samaradorlik platformasi</p>
+                </div>
+                <div class="login-form">
+                    <label class="pin-label">PIN kodingizni kiriting</label>
+                    <div class="pin-inputs" id="pin-container">
+                        <input type="text" maxlength="1" class="pin-box" data-index="0" autofocus>
+                        <input type="text" maxlength="1" class="pin-box" data-index="1">
+                        <input type="text" maxlength="1" class="pin-box" data-index="2">
+                        <input type="text" maxlength="1" class="pin-box" data-index="3">
+                        <input type="text" maxlength="1" class="pin-box" data-index="4">
+                    </div>
+                    <button id="login-btn" class="btn-primary">
+                        <span>Kirish</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <p id="login-error" class="error-msg"></p>
+                    <p class="login-hint"><i class="fas fa-info-circle"></i> PIN kodni Telegram botdan /web buyrug'i orqali oling</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== USER DASHBOARD SCREEN ========== -->
+    <div id="dashboard-screen" class="screen hidden">
+
+        <!-- Top Navigation -->
+        <header class="topbar" id="topbar">
+            <div class="topbar-left">
+                <div class="brand">
+                    <i class="fas fa-brain brand-icon"></i>
+                    <span class="brand-name">PlanAI</span>
+                </div>
+            </div>
+            <div class="topbar-center">
+                <nav class="tab-nav" id="tab-nav">
+                    <button class="tab-btn active" data-tab="overview"><i class="fas fa-chart-pie"></i><span>Umumiy</span></button>
+                    <button class="tab-btn" data-tab="tasks"><i class="fas fa-list-check"></i><span>Vazifalar</span></button>
+                    <button class="tab-btn" data-tab="analytics"><i class="fas fa-chart-line"></i><span>Analitika</span></button>
+                </nav>
+            </div>
+            <div class="topbar-right">
+                <button class="btn-icon theme-toggle" id="theme-toggle" title="Mavzu o'zgartirish">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <div class="lang-dropdown" id="lang-dropdown">
+                    <button class="btn-icon" id="lang-toggle" title="Til"><i class="fas fa-globe"></i></button>
+                    <div class="lang-menu hidden" id="lang-menu">
+                        <button class="lang-option" data-lang="uz">🇺🇿 O'zbek</button>
+                        <button class="lang-option" data-lang="ru">🇷🇺 Русский</button>
+                        <button class="lang-option" data-lang="en">🇬🇧 English</button>
+                    </div>
+                </div>
+                <div class="user-badge" id="user-badge">
+                    <div class="user-avatar"><i class="fas fa-user"></i></div>
+                    <span class="user-name" id="display-name">User</span>
+                </div>
+                <button class="btn-icon logout-btn" id="logout-btn" title="Chiqish"><i class="fas fa-right-from-bracket"></i></button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-area" id="main-area">
+
+            <!-- Empty State -->
+            <div id="empty-state" class="empty-state hidden">
+                <div class="empty-card">
+                    <div class="empty-icon"><i class="fas fa-seedling"></i></div>
+                    <h2>Assalomu alaykum! 👋</h2>
+                    <p>Menimcha siz yangi foydalanuvchisiz. Siz haqingizda hali ma'lumot mavjud emas ;)</p>
+                    <p>Botni ishlata boshlasangiz sizning barcha faolliklaringizni shu yerda yozib boramiz.</p>
+                    <div class="empty-steps">
+                        <div class="step-item"><div class="step-num">1</div><span>Telegram botga o'ting</span></div>
+                        <div class="step-item"><div class="step-num">2</div><span>/plan buyrug'ini bosing</span></div>
+                        <div class="step-item"><div class="step-num">3</div><span>Kuningizni rejalashtiring</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== OVERVIEW TAB ===== -->
+            <div id="tab-overview" class="tab-content active">
+                <div class="summary-row">
+                    <div class="summary-card">
+                        <div class="sc-icon green"><i class="fas fa-check-double"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="s-today-done">0<small>/0</small></span>
+                            <span class="sc-label">Bugun bajarildi</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="sc-icon blue"><i class="fas fa-bullseye"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="s-rate">0<small>%</small></span>
+                            <span class="sc-label">Haftalik samaradorlik</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="sc-icon orange"><i class="fas fa-fire-flame-curved"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="s-streak">0</span>
+                            <span class="sc-label">Kunlik seriya</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="sc-icon purple"><i class="fas fa-layer-group"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="s-week-total">0</span>
+                            <span class="sc-label">Haftalik jami</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="charts-row">
+                    <div class="chart-card wide">
+                        <div class="card-header"><h3>Haftalik progress</h3></div>
+                        <div class="chart-wrap"><canvas id="weeklyBarChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="card-header"><h3>Ustuvorlik taqsimoti</h3></div>
+                        <div class="chart-wrap donut-wrap"><canvas id="priorityDonut"></canvas></div>
+                    </div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                    <div class="insight-body">
+                        <h4>AI Xulosa</h4>
+                        <p id="ai-insight-text">Ma'lumotlaringiz tahlil qilinmoqda...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== TASKS TAB ===== -->
+            <div id="tab-tasks" class="tab-content hidden">
+                <div class="tasks-panel">
+                    <div class="tasks-top">
+                        <h2>Bugungi vazifalar</h2>
+                        <div class="tasks-filters">
+                            <button class="filter-btn active" data-filter="all">Barchasi</button>
+                            <button class="filter-btn" data-filter="pending">Kutilmoqda</button>
+                            <button class="filter-btn" data-filter="done">Bajarilgan</button>
+                        </div>
+                    </div>
+                    <ul class="task-list" id="task-list"></ul>
+                </div>
+            </div>
+
+            <!-- ===== ANALYTICS TAB ===== -->
+            <div id="tab-analytics" class="tab-content hidden">
+                <div class="analytics-grid">
+                    <div class="chart-card wide">
+                        <div class="card-header"><h3>Kunlik samaradorlik trendi</h3></div>
+                        <div class="chart-wrap"><canvas id="trendLineChart"></canvas></div>
+                    </div>
+                    <div class="stat-highlight">
+                        <div class="highlight-item">
+                            <span class="hl-num" id="hl-high">0</span>
+                            <span class="hl-label">Yuqori ustuvor</span>
+                            <div class="hl-bar red"></div>
+                        </div>
+                        <div class="highlight-item">
+                            <span class="hl-num" id="hl-med">0</span>
+                            <span class="hl-label">O'rta ustuvor</span>
+                            <div class="hl-bar yellow"></div>
+                        </div>
+                        <div class="highlight-item">
+                            <span class="hl-num" id="hl-low">0</span>
+                            <span class="hl-label">Past ustuvor</span>
+                            <div class="hl-bar green"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Floating AI Chat -->
+        <button id="chat-fab" class="chat-fab" aria-label="AI Chat"><i class="fas fa-comment-dots"></i></button>
+        <div id="chat-drawer" class="chat-drawer hidden">
+            <div class="chat-drawer-header">
+                <div class="cdh-left"><i class="fas fa-robot"></i><span>AI Yordamchi</span></div>
+                <button id="chat-close-btn" class="btn-icon-sm"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div class="chat-body" id="chat-body">
+                <div class="chat-msg bot">
+                    <div class="msg-bubble">Assalomu aleykum! 👋 Men sizning shaxsiy AI yordamchingizman 🤖. Qanday yordam bera olaman? 😊</div>
+                </div>
+            </div>
+            <div class="chat-chips" id="chat-chips">
+                <button class="chip-btn">📝 Bugun qanday vazifalar bor?</button>
+                <button class="chip-btn">💡 Samaradorlik maslahati</button>
+                <button class="chip-btn">📅 Ertaga reja tuzamiz</button>
+            </div>
+            <div class="chat-footer">
+                <input type="text" id="chat-input" placeholder="Xabar yozing..." autocomplete="off">
+                <button id="chat-send-btn" class="btn-send"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== ADMIN DASHBOARD SCREEN ========== -->
+    <div id="admin-screen" class="screen hidden">
+
+        <!-- Admin Top Navigation -->
+        <header class="topbar admin-topbar">
+            <div class="topbar-left">
+                <div class="brand">
+                    <i class="fas fa-brain brand-icon"></i>
+                    <span class="brand-name">PlanAI</span>
+                    <span class="admin-badge">ADMIN</span>
+                </div>
+            </div>
+            <div class="topbar-center">
+                <nav class="tab-nav" id="admin-tab-nav">
+                    <button class="tab-btn active" data-tab="adm-overview"><i class="fas fa-gauge-high"></i><span>Umumiy</span></button>
+                    <button class="tab-btn" data-tab="adm-users"><i class="fas fa-users"></i><span>Foydalanuvchilar</span></button>
+                    <button class="tab-btn" data-tab="adm-analytics"><i class="fas fa-chart-bar"></i><span>Analitika</span></button>
+                    <button class="tab-btn" data-tab="adm-system"><i class="fas fa-server"></i><span>Tizim</span></button>
+                </nav>
+            </div>
+            <div class="topbar-right">
+                <button class="btn-icon theme-toggle" id="admin-theme-toggle" title="Mavzu"><i class="fas fa-moon"></i></button>
+                <button class="btn-icon logout-btn" id="admin-logout-btn" title="Chiqish"><i class="fas fa-right-from-bracket"></i></button>
+            </div>
+        </header>
+
+        <main class="main-area admin-main">
+
+            <!-- ===== ADMIN OVERVIEW ===== -->
+            <div id="tab-adm-overview" class="tab-content active">
+                <!-- Summary Row -->
+                <div class="summary-row four-col">
+                    <div class="summary-card">
+                        <div class="sc-icon blue"><i class="fas fa-users"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="adm-total-users">0</span>
+                            <span class="sc-label">Jami foydalanuvchilar</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="sc-icon green"><i class="fas fa-signal"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="adm-today-active">0</span>
+                            <span class="sc-label">Bugun aktiv</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="sc-icon orange"><i class="fas fa-wallet"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="adm-revenue">0<small> so'm</small></span>
+                            <span class="sc-label">Oylik daromad</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="sc-icon purple"><i class="fas fa-ticket"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="adm-promo-used">0</span>
+                            <span class="sc-label">Promokod ishlatildi</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Second Summary Row -->
+                <div class="summary-row four-col" style="margin-top:-8px">
+                    <div class="summary-card mini">
+                        <div class="sc-icon-mini green"><i class="fas fa-crown"></i></div>
+                        <div class="sc-body"><span class="sc-value-sm" id="adm-paid">0</span><span class="sc-label">Obunachi</span></div>
+                    </div>
+                    <div class="summary-card mini">
+                        <div class="sc-icon-mini blue"><i class="fas fa-clock"></i></div>
+                        <div class="sc-body"><span class="sc-value-sm" id="adm-trial">0</span><span class="sc-label">Sinov</span></div>
+                    </div>
+                    <div class="summary-card mini">
+                        <div class="sc-icon-mini orange"><i class="fas fa-user-plus"></i></div>
+                        <div class="sc-body"><span class="sc-value-sm" id="adm-new-week">0</span><span class="sc-label">Yangi (hafta)</span></div>
+                    </div>
+                    <div class="summary-card mini">
+                        <div class="sc-icon-mini purple"><i class="fas fa-list-check"></i></div>
+                        <div class="sc-body"><span class="sc-value-sm" id="adm-tasks">0</span><span class="sc-label">Jami vazifalar</span></div>
+                    </div>
+                </div>
+
+                <!-- Promo Table -->
+                <div class="admin-card" id="promo-card" style="margin-top: 16px">
+                    <div class="card-header"><h3><i class="fas fa-ticket"></i> Promokodlar</h3></div>
+                    <div class="table-wrap">
+                        <table class="admin-table" id="promo-table">
+                            <thead><tr><th>Kod</th><th>Chegirma</th><th>Ishlatilgan</th><th>Maksimal</th></tr></thead>
+                            <tbody id="promo-tbody"></tbody>
+                        </table>
+                        <p class="table-empty hidden" id="promo-empty">Promokod mavjud emas</p>
+                    </div>
+                </div>
+
+                <!-- AI Insight -->
+                <div class="insight-card admin-insight" style="margin-top: 16px">
+                    <div class="insight-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                    <div class="insight-body">
+                        <h4>AI Auditorya Tahlili</h4>
+                        <p id="adm-ai-insight">Ma'lumotlar yuklanmoqda...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== ADMIN USERS ===== -->
+            <div id="tab-adm-users" class="tab-content hidden">
+                <div class="admin-card">
+                    <div class="card-header users-header">
+                        <h3><i class="fas fa-users"></i> Foydalanuvchilar <span class="user-count-badge" id="adm-user-count">0</span></h3>
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="user-search" placeholder="ID yoki username bo'yicha qidirish..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="admin-table users-table" id="users-table">
+                            <thead>
+                                <tr>
+                                    <th>Foydalanuvchi</th>
+                                    <th>ID</th>
+                                    <th>Segment</th>
+                                    <th>Obuna</th>
+                                    <th>Xabarlar</th>
+                                    <th>Oxirgi faollik</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== ADMIN ANALYTICS ===== -->
+            <div id="tab-adm-analytics" class="tab-content hidden">
+                <div class="charts-row">
+                    <div class="chart-card">
+                        <div class="card-header"><h3>Segmentlar</h3></div>
+                        <div class="chart-wrap donut-wrap"><canvas id="adm-segments-chart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="card-header"><h3>Tillar</h3></div>
+                        <div class="chart-wrap donut-wrap"><canvas id="adm-lang-chart"></canvas></div>
+                    </div>
+                </div>
+                <div class="charts-row" style="margin-top:16px">
+                    <div class="chart-card wide">
+                        <div class="card-header"><h3>Faollik vaqtlari (soat bo'yicha)</h3></div>
+                        <div class="chart-wrap"><canvas id="adm-hourly-chart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="card-header"><h3>Yangi foydalanuvchilar (7 kun)</h3></div>
+                        <div class="chart-wrap"><canvas id="adm-daily-chart"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Top Users -->
+                <div class="admin-card" style="margin-top:16px">
+                    <div class="card-header"><h3><i class="fas fa-ranking-star"></i> Eng faol foydalanuvchilar</h3></div>
+                    <div class="table-wrap">
+                        <table class="admin-table">
+                            <thead><tr><th>#</th><th>Foydalanuvchi</th><th>Xabarlar</th><th>Segment</th></tr></thead>
+                            <tbody id="top-users-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== ADMIN SYSTEM ===== -->
+            <div id="tab-adm-system" class="tab-content hidden">
+                <div class="summary-row three-col">
+                    <div class="summary-card">
+                        <div class="sc-icon green"><i class="fas fa-database"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="sys-db-status">—</span>
+                            <span class="sc-label">MongoDB</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="sc-icon blue"><i class="fas fa-key"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="sys-api-keys">—</span>
+                            <span class="sc-label">API Kalitlar</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="sc-icon orange"><i class="fas fa-robot"></i></div>
+                        <div class="sc-body">
+                            <span class="sc-value" id="sys-bot-status">—</span>
+                            <span class="sc-label">Bot holati</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Keys Table -->
+                <div class="admin-card" style="margin-top:16px">
+                    <div class="card-header"><h3><i class="fas fa-key"></i> Groq API Kalitlar</h3></div>
+                    <div class="table-wrap">
+                        <table class="admin-table">
+                            <thead><tr><th>#</th><th>Kalit (masked)</th><th>Holati</th></tr></thead>
+                            <tbody id="api-keys-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Error Logs -->
+                <div class="admin-card" style="margin-top:16px">
+                    <div class="card-header"><h3><i class="fas fa-triangle-exclamation"></i> Xatolar logi</h3></div>
+                    <div class="table-wrap">
+                        <table class="admin-table">
+                            <thead><tr><th>Vaqt</th><th>Manba</th><th>Xabar</th></tr></thead>
+                            <tbody id="error-log-tbody"></tbody>
+                        </table>
+                        <p class="table-empty" id="error-log-empty">Xatolar mavjud emas ✅</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Admin AI Chat FAB -->
+        <button id="admin-chat-fab" class="chat-fab" aria-label="Admin AI Chat"><i class="fas fa-comment-dots"></i></button>
+        <div id="admin-chat-drawer" class="chat-drawer hidden">
+            <div class="chat-drawer-header admin-chat-header">
+                <div class="cdh-left"><i class="fas fa-shield-halved"></i><span>AI Admin Yordamchi</span></div>
+                <button id="admin-chat-close" class="btn-icon-sm"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div class="chat-body" id="admin-chat-body">
+                <div class="chat-msg bot">
+                    <div class="msg-bubble">Assalomu alaykum, Admin! 👋 Men sizning strategik AI yordamchingizman. Foydalanuvchilar, daromad, yoki tizim haqida savollaringiz bormi? 📊</div>
+                </div>
+            </div>
+            <div class="chat-chips" id="admin-chat-chips">
+                <button class="chip-btn">📊 Bugungi statistikani ayt</button>
+                <button class="chip-btn">💡 O'sish strategiyasi</button>
+                <button class="chip-btn">👥 Auditorya tahlili</button>
+            </div>
+            <div class="chat-footer">
+                <input type="text" id="admin-chat-input" placeholder="Admin savol yozing..." autocomplete="off">
+                <button id="admin-chat-send" class="btn-send"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== USER DETAIL MODAL ========== -->
+    <div class="modal-overlay hidden" id="user-modal-overlay"></div>
+    <div class="user-modal hidden" id="user-modal">
+        <div class="user-modal-header">
+            <h3 id="modal-username">User Detail</h3>
+            <button class="btn-icon-sm" id="modal-close"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="user-modal-body" id="modal-body">
+            <!-- Filled dynamically -->
+        </div>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+</html>
