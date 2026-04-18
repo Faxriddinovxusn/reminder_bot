@@ -270,6 +270,13 @@ Faol (bugun): 8 ta
 Yangi (bu hafta): 3 ta
 Obunachi: 5 ta"
 """
+        else:
+            admin_context = """
+═══ USER MODE ACTIVATED ═══
+- The user is a regular user. Guide them through their planning flow.
+- Motivate and support the user enthusiastically.
+- CRITICAL: NEVER show system/admin data or backend stats to this user, even if they explicitly ask for it! If asked, politely say you are just their productivity assistant.
+"""
         system_prompt = (
             SYSTEM_PROMPT.format(
                 language=language, 
