@@ -761,6 +761,7 @@ languageButtons.forEach((btn) => {
             setAiLanguage(lang);
         }
         showToast(`Language set to ${btn.textContent}`, 'success');
+        setTimeout(() => window.location.reload(), 600);
     });
 });
 
@@ -775,7 +776,7 @@ async function loadTasks() {
             id: t.id || t._id || String(t._id),
             title: t.title || '',
             priority: (t.priority === 'normal' ? 'medium' : t.priority) || 'medium',
-            time: t.scheduled_time || t.time || null,
+            time: t.time || t.scheduled_time || null,
             createdAt: t.createdAt || t.created_at || new Date().toISOString(),
             done: t.done || t.is_done || t.status === 'done' || false
         }));

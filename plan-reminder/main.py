@@ -120,8 +120,8 @@ async def check_reminders(application) -> None:
                 scheduled = task.get("scheduled_time")
                 if not scheduled:
                     continue
-                if scheduled.tzinfo is None:
-                    scheduled = scheduled.replace(tzinfo=timezone.utc)
+                if scheduled.tzinfo is not None:
+                    scheduled = scheduled.astimezone(timezone.utc).replace(tzinfo=None)
                 if now_utc >= scheduled:
                     user = await db.users.find_one({"telegram_id": {
                         "$in": [task.get("telegram_id"), str(task.get("telegram_id")), task.get("user_id")]
