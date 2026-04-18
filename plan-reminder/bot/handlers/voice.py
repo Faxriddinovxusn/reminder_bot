@@ -81,7 +81,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 return
         except Exception as e:
             logging.exception("Whisper transcription error: %s", e)
-            await update.message.reply_text("Ovozni transcribe qilishda xato yuz berdi.")
+            await update.message.reply_text(f"Ovozni transcribe qilishda xato yuz berdi. Iltimos, Railway'da kalitlarni tekshiring yoki adminga xabar bering. (Xato: {str(e)})")
             return
         
         from bot.models.state import get_state, set_state, clear_state
