@@ -148,12 +148,12 @@ CRITICAL LIMITATION: You MUST NOT write long explanations when outputting "propo
 - If the user says "kechikdim" or "uxlab qolibman", acknowledge it empathetically and smoothly ask what new time they would like to reschedule the nearest task to.
 - If the user needs help ("yordam ber"), provide intelligent advice based strictly on their current context/tasks.
 
-═══ RULE 5: PERSONALITY, TONE & EMOJIS (CRITICAL) ═══
-- Be extremely polite, respectful, warm, and supportive (e.g. use "Siz", "Iltimos", "Rahmat").
-- ALWAYS try to make the user happy and motivate them. Support their ideas enthusiastically!
-- Be SHORT, precise, simple, and direct. Do NOT write long paragraphs. Keep it to 1-3 short sentences max.
-- Stay ON TOPIC. Avoid rambling.
-- ALWAYS use emojis naturally, but keep it balanced (1-3 emojis per message max). It makes the chat lively!
+═══ RULE 5: COMMUNICATION, LOGIC & GRAMMAR (CRITICAL) ═══
+- Be extremely logical. Think carefully before answering. Ensure your response makes complete sense based on the user's tasks and context.
+- Be FLAWLESS in grammar and spelling in the target language (especially Uzbek). Do NOT make spelling mistakes.
+- Be SHORT, precise, simple, and direct. Do NOT write unnecessary long paragraphs. 1-2 short sentences max.
+- Be polite, respectful, warm, and supportive (e.g. use "Siz", "Iltimos", "Rahmat").
+- ALWAYS use emojis naturally, but keep it balanced (1-2 emojis per message max).
 
 ═══ RULE 6: APP CONTROL (OUTPUTTING JSON) ═══
 You have full control over the user's tasks!
@@ -342,7 +342,8 @@ Return ONLY a valid JSON array, nothing else:
 [{{ "title": "task name", "time": "HH:MM", "priority": "high/normal/low", "is_recurring": false }}]
 
 Rules:
-- Fix spelling mistakes in task titles
+- Fix ALL spelling and grammatical mistakes in task titles. Task titles must be flawlessly written in the target language.
+- Keep task titles short, simple, concise, and clear. Avoid any unnecessary long words.
 - If user says "har kuni" or "every day" → is_recurring: true
 - Detect language and understand uz/ru/en input
 - If any task is missing a time, return an empty array [] so the bot can ask for the time later.
@@ -355,7 +356,18 @@ Text: {text}"""
         )
         result = result.replace("```json", "").replace("```", "").strip()
         tasks = json.loads(result)
-        return tasks if isinstance(tasks, list) else []
+        if isinstance(tasks, list):
+            def parse_time(t_str):
+                if not t_str: return 9999 # Push to end if no time
+                try:
+                    h, m = map(int, t_str.split(':'))
+                    return h * 60 + m
+                except:
+                    return 9999
+            
+            tasks.sort(key=lambda x: parse_time(x.get("time")))
+            return tasks
+        return []
     except Exception as e:
         logging.exception("extract_tasks_from_text error: %s", e)
         return []
@@ -392,7 +404,20 @@ User Text: {text}"""
         )
         result = result.replace("```json", "").replace("```", "").strip()
         data = json.loads(result)
-        return data if isinstance(data, dict) else {}
+        if isinstance(data, dict):
+            def parse_time(t_str):
+                if not t_str: return 9999
+                try:
+                    h, m = map(int, t_str.split(':'))
+                    return h * 60 + m
+                except:
+                    return 9999
+            
+            for date_key, task_list in data.items():
+                if isinstance(task_list, list):
+                    task_list.sort(key=lambda x: parse_time(x.get("time")))
+            return data
+        return {}
     except Exception as e:
         logging.exception("extract_monthly_dates_and_tasks error: %s", e)
         return {}
