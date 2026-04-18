@@ -6,7 +6,7 @@ import os
 import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
-from groq import Groq
+import httpx
 
 # Robust .env loading
 _dir = Path(__file__).resolve().parent
@@ -21,9 +21,31 @@ from bot.models.user import get_user_by_telegram_id
 from bot.services.ai import get_ai_response
 from bot.messages import messages
 
-# The Groq client will be instantiated lazily inside the handler to ensure env variables are loaded.
 # Temp folder for voice files — use system temp dir (cross-platform)
 TEMP_DIR = tempfile.gettempdir()
+
+GROQ_WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+
+async def _transcribe_voice_httpx(file_path: str, file_name: str, api_key: str, language: str = "en") -> str:
+    """Transcribe audio using Groq Whisper API via direct HTTP call (httpx).
+    This avoids any SDK version issues completely."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        with open(file_path, "rb") as f:
+            file_bytes = f.read()
+        
+        resp = await client.post(
+            GROQ_WHISPER_URL,
+            headers={"Authorization": f"Bearer {api_key}"},
+            files={"file": (file_name, file_bytes, "audio/ogg")},
+            data={
+                "model": "whisper-large-v3",
+                "response_format": "json",
+                "language": language,
+            },
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        return result.get("text", "")
 
 async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle incoming voice messages"""
@@ -64,24 +86,23 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         try:
             from bot.services.ai import get_current_api_key
-            # Ovoz uchun maxsus ajratilgan API kalitni qidiradi, yo'q bo'lsa umumiy kalitlardan birini oladi.
             whisper_key = os.getenv("GROQ_WHISPER_API_KEY") or get_current_api_key()
-            groq_client = Groq(api_key=whisper_key)
-            with open(temp_file_path, "rb") as f:
-                transcription = groq_client.audio.transcriptions.create(
-                    file=(file_name, f.read()),
-                    model="whisper-large-v3",
-                    response_format="json",
-                    language="uz" if lang == "uz" else ("ru" if lang == "ru" else "en")
-                )
-            transcribed_text = transcription.text
+            whisper_lang = "uz" if lang == "uz" else ("ru" if lang == "ru" else "en")
+            
+            transcribed_text = await _transcribe_voice_httpx(
+                file_path=temp_file_path,
+                file_name=file_name,
+                api_key=whisper_key,
+                language=whisper_lang,
+            )
+            
             if not transcribed_text or not transcribed_text.strip():
                 logging.warning("Whisper returned empty transcription for user %s", tg_id)
                 await update.message.reply_text("Ovozni aniqlab bo'lmadi. Iltimos, aniqroq gapiring.")
                 return
         except Exception as e:
             logging.exception("Whisper transcription error: %s", e)
-            await update.message.reply_text(f"Ovozni transcribe qilishda xato yuz berdi. Iltimos, Railway'da kalitlarni tekshiring yoki adminga xabar bering. (Xato: {str(e)})")
+            await update.message.reply_text(f"Ovozni transcribe qilishda xato yuz berdi. (Xato: {str(e)[:200]})")
             return
         
         from bot.models.state import get_state, set_state, clear_state
