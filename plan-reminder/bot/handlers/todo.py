@@ -922,6 +922,17 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await send_plan_confirmation_message(update.message, extracted_tasks, lang)
                 return
 
+        # Intercept unknown_intent BEFORE sending normal response
+        if not is_admin_user and action_result and action_result.get("action") == "unknown_intent":
+            await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
+            fallback_text = {
+                "uz": "Kechirasiz, sizni yaxshi tushunmadim.\nReja tuzish uchun /plan ni bosing\nTilni o'zgartirish uchun /language\nWebsaytda statistikani ko'rish uchun /web\nMini ilovaga kirish uchun /app\nSuhbat qurish uchun /free commandini yuboring.",
+                "ru": "Извините, я вас не понял.\nНажмите /plan, чтобы составить план\nНажмите /language для смены языка\nОтправьте /web для просмотра статистики\nОтправьте /app для входа в мини-приложение\nОтправьте /free для свободного общения.",
+                "en": "Sorry, I didn't quite understand you.\nPress /plan to create a plan\nPress /language to change language\nSend /web to view statistics on website\nSend /app to open mini app\nSend /free for casual chat."
+            }
+            await update.message.reply_text(fallback_text.get(lang, fallback_text["uz"]))
+            return
+
         await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
 
         # Add reminder message every 4th interaction if idle

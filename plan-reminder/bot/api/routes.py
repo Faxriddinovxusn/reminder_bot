@@ -584,6 +584,9 @@ async def detect_and_execute_action(message: str, ai_response: str, user_id: str
                     # We just return the proposed tasks without saving them yet
                     return {"action": "propose_tasks", "data": data}
                 
+                elif action == "unknown_intent":
+                    return {"action": "unknown_intent", "data": None}
+                
                 elif action == "delete_task" and target_title:
                     regex = re.compile(re.escape(target_title), re.IGNORECASE)
                     task = await db.tasks.find_one({"user_id": user["_id"], "date": today, "title": regex})

@@ -202,6 +202,16 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                     await update.message.reply_text(clean_ai_response)
                 await send_plan_confirmation_message(update.message, extracted_tasks, lang)
                 return
+
+        # Intercept unknown_intent from voice
+        if action_result and action_result.get("action") == "unknown_intent":
+            fallback_text = {
+                "uz": "Kechirasiz, sizni yaxshi tushunmadim.\nReja tuzish uchun /plan ni bosing\nTilni o'zgartirish uchun /language\nWebsaytda statistikani ko'rish uchun /web\nMini ilovaga kirish uchun /app\nSuhbat qurish uchun /free commandini yuboring.",
+                "ru": "Извините, я вас не понял.\nНажмите /plan, чтобы составить план\nНажмите /language для смены языка\nОтправьте /web для просмотра статистики\nОтправьте /app для входа в мини-приложение\nОтправьте /free для свободного общения.",
+                "en": "Sorry, I didn't quite understand you.\nPress /plan to create a plan\nPress /language to change language\nSend /web to view statistics on website\nSend /app to open mini app\nSend /free for casual chat."
+            }
+            await update.message.reply_text(fallback_text.get(lang, fallback_text["uz"]))
+            return
         
         # Send AI response back to user
         await update.message.reply_text(clean_ai_response)

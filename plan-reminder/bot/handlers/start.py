@@ -136,3 +136,29 @@ async def app_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         logging.exception("app_command error: %s", e)
         if update.message:
             await update.message.reply_text("Biroz xatolik yuz berdi :(")
+
+async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        user = update.effective_user
+        if not user:
+            return
+            
+        from bot.services.db import get_user_by_telegram_id
+        from bot.handlers.todo import set_state
+        
+        db_user = await get_user_by_telegram_id(user.id)
+        lang = db_user.get("language", "uz") if db_user else "uz"
+        
+        await set_state(user.id, "free_chat")
+        
+        texts = {
+            "uz": "Endi men bilan erkin suhbatlashishingiz mumkin! 😊 Agar reja tuzmoqchi bo'lsangiz, /plan ni bosing.",
+            "ru": "Теперь вы можете свободно общаться со мной! 😊 Если хотите составить план, нажмите /plan.",
+            "en": "You can now chat with me freely! 😊 If you want to create a plan, press /plan."
+        }
+        
+        await update.message.reply_text(texts.get(lang, texts["uz"]))
+    except Exception as e:
+        logging.exception("free_command error: %s", e)
+        if update.message:
+            await update.message.reply_text("Biroz xatolik yuz berdi :(")
