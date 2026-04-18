@@ -64,8 +64,8 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         # Send to Groq Whisper API for transcription
         try:
-            # Initialize client here to ensure environment variables are already loaded
-            groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+            from bot.services.ai import get_current_api_key
+            groq_client = Groq(api_key=get_current_api_key())
             with open(temp_file_path, "rb") as f:
                 transcription = groq_client.audio.transcriptions.create(
                     file=(file_name, f.read()),

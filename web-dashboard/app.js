@@ -236,15 +236,6 @@ async function loadAll() {
         const stats = statsRes.data || {};
         allTasks = tasksRes.data || [];
 
-        const isEmpty = (stats.weekTotal === 0 || stats.weekTotal === undefined) && allTasks.length === 0;
-        document.getElementById('empty-state').classList.toggle('hidden', !isEmpty);
-        document.querySelectorAll('#dashboard-screen .tab-content').forEach(t => {
-            if (isEmpty) t.classList.remove('active');
-        });
-        if (isEmpty) {
-            document.getElementById('empty-state').classList.remove('hidden');
-            return;
-        }
         const activeTab = document.querySelector('#tab-nav .tab-btn.active');
         if (activeTab) {
             const el = document.getElementById('tab-' + activeTab.dataset.tab);
