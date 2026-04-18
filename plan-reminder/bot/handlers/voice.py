@@ -62,10 +62,11 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         # Download voice file
         await voice_file.download_to_drive(custom_path=temp_file_path)
         
-        # Send to Groq Whisper API for transcription
         try:
             from bot.services.ai import get_current_api_key
-            groq_client = Groq(api_key=get_current_api_key())
+            # Ovoz uchun maxsus ajratilgan API kalitni qidiradi, yo'q bo'lsa umumiy kalitlardan birini oladi.
+            whisper_key = os.getenv("GROQ_WHISPER_API_KEY") or get_current_api_key()
+            groq_client = Groq(api_key=whisper_key)
             with open(temp_file_path, "rb") as f:
                 transcription = groq_client.audio.transcriptions.create(
                     file=(file_name, f.read()),
