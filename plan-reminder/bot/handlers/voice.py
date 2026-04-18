@@ -136,29 +136,6 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             tasks_str = _json.dumps(pending_tasks, ensure_ascii=False)
             transcribed_text = f"<system>SYSTEM INFO: The user is currently editing the following pending plan. You MUST output action 'propose_tasks' JSON block with the updated list of tasks.\nCURRENT TASKS: {tasks_str}</system>\n\nUSER EDITS: {transcribed_text}"
         
-        if current_state == "awaiting_plan":
-            plan_type = state_doc.get("plan_type", "daily")
-            extracted_tasks = await extract_tasks_from_text(transcribed_text, lang, db_user.get("habits", []), plan_type) or []
-            if extracted_tasks:
-                await set_state(tg_id, "awaiting_confirmation", pending_tasks=extracted_tasks, current_task_index=0)
-                await update_user_profile_after_message(
-                    telegram_id=tg_id,
-                    username=user.username or db_user.get("username") or "User",
-                    db_user=db_user,
-                    language=lang,
-                    user_message=transcribed_text,
-                    extracted_tasks=extracted_tasks,
-                    profile_updates={
-                        "last_active": datetime.utcnow(),
-                        "interaction_count": int(db_user.get("interaction_count", 0) or 0) + 1,
-                    },
-                    ai_response="Plan extracted and awaiting confirmation."
-                )
-                await send_plan_confirmation_message(update.message, extracted_tasks, lang)
-                return
-            else:
-                await clear_state(tg_id)
-
         if current_state == "awaiting_monthly_input":
             from bot.services.ai import extract_monthly_dates_and_tasks
             monthly_dict = await extract_monthly_dates_and_tasks(transcribed_text, lang)
@@ -183,6 +160,9 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         history = db_user.get("chat_history", [])
         
         # Get AI response based on transcribed text
+        from bot.handlers.admin import is_admin as check_is_admin
+        is_admin_user = await check_is_admin(update)
+
         user_profile = {
             "username": db_user.get("username") or user.username or "User",
             "interaction_count": db_user.get("interaction_count", 0),
@@ -190,7 +170,8 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             "habits": db_user.get("habits", []),
             "communication_style": db_user.get("communication_style", "casual"),
             "topics_discussed": db_user.get("topics_discussed", []),
-            "current_state": current_state
+            "current_state": current_state,
+            "is_admin": is_admin_user,
         }
         
         response_data = await get_ai_response(transcribed_text, lang, history, user_profile)

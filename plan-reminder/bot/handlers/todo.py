@@ -801,26 +801,6 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         history = db_user.get("chat_history", [])
 
         extracted_tasks = []
-        if current_state in ["awaiting_plan", "awaiting_plan_day"]:
-            plan_type = state_doc.get("plan_type", "daily")
-            extracted_tasks = await extract_tasks_from_text(user_message, lang, db_user.get("habits", []), plan_type) or []
-            if extracted_tasks:
-                await set_state(tg_id, "awaiting_confirmation", pending_tasks=extracted_tasks, current_task_index=0)
-                await update_user_profile_after_message(
-                    telegram_id=tg_id,
-                    username=user.username or db_user.get("username") or "User",
-                    db_user=db_user,
-                    language=lang,
-                    user_message=user_message,
-                    extracted_tasks=extracted_tasks,
-                    profile_updates={
-                        "last_active": datetime.utcnow(),
-                        "interaction_count": int(db_user.get("interaction_count", 0) or 0) + 1,
-                    },
-                    ai_response="Plan extracted and awaiting confirmation.",
-                )
-                await send_plan_confirmation_message(update.message, extracted_tasks, lang)
-                return
 
         if current_state == "awaiting_monthly_input":
             from bot.services.ai import extract_monthly_dates_and_tasks
@@ -854,6 +834,7 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "active_plan_type": db_user.get("active_plan_type"),
             "current_state": current_state,
             "building_date": state_doc.get("target_date"),
+            "is_admin": is_admin_user,
         }
         ai_result = await get_ai_response(user_message_to_ai, lang, history, user_profile=user_profile)
         if isinstance(ai_result, tuple):
@@ -932,16 +913,14 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         
         # Intercept propose_tasks BEFORE sending normal response
         if not is_admin_user and action_result and action_result.get("action") == "propose_tasks":
-            # Avoid forcing plans in casual chat
-            if current_state != "idle" and current_state not in ["awaiting_confirmation", "awaiting_reminder"]:
-                extracted_tasks = action_result.get("data") or []
-                if extracted_tasks:
-                    await set_state(tg_id, "awaiting_confirmation", pending_tasks=extracted_tasks, current_task_index=0)
-                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
-                    if clean_ai_response:
-                        await update.message.reply_text(clean_ai_response)
-                    await send_plan_confirmation_message(update.message, extracted_tasks, lang)
-                    return
+            extracted_tasks = action_result.get("data") or []
+            if extracted_tasks:
+                await set_state(tg_id, "awaiting_confirmation", pending_tasks=extracted_tasks, current_task_index=0)
+                await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
+                if clean_ai_response:
+                    await update.message.reply_text(clean_ai_response)
+                await send_plan_confirmation_message(update.message, extracted_tasks, lang)
+                return
 
         await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
 

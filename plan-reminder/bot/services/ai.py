@@ -254,6 +254,22 @@ PERSONALIZATION RULES:
 - Make it feel natural, like a friend who knows them well
 """
 
+        is_admin = profile_data.get("is_admin", False)
+        admin_context = ""
+        if is_admin:
+            admin_context = """
+═══ ADMIN MODE ACTIVATED ═══
+- The user is the SYSTEM ADMINISTRATOR.
+- If the admin asks for data/stats (e.g., "foydalanuvchilar haqida"), provide clean, formatted statistics. NO bullet points if a table/list format is better.
+- No productivity motivation needed for the admin. They manage the system.
+- Format data perfectly:
+Example:
+"📊 Foydalanuvchilar:
+Jami: 24 ta
+Faol (bugun): 8 ta
+Yangi (bu hafta): 3 ta
+Obunachi: 5 ta"
+"""
         system_prompt = (
             SYSTEM_PROMPT.format(
                 language=language, 
@@ -261,6 +277,7 @@ PERSONALIZATION RULES:
                 current_date=current_date, 
                 history=history_text
             )
+            + admin_context
             + "\n\nUSER_INFO:\n"
             + f"- Name: {profile_data.get('username', 'User')}\n"
             + f"- Interaction count: {current_interaction_count}\n"
