@@ -224,6 +224,7 @@ body {
     display: flex; align-items: center; justify-content: center;
     transition: var(--transition);
     position: relative;
+    flex-shrink: 0;
 }
 .btn-icon:hover { background: var(--accent-light); color: var(--accent); }
 .logout-btn:hover { background: var(--red-bg); color: var(--red); }

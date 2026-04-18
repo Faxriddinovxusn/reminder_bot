@@ -55,9 +55,9 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         
         # Voice instruction message
         voice_messages = {
-            "uz": "Assalomu aleykum!\n🎤 Ovozli xabarlar orqali ham muloqot qilishimiz mumkin, faqat aniq gapirsangiz bas.\n\n📅 Reja tuzish uchun: /plan\n📊 Statistika va jarayonlar uchun: /web\n📱 Mini ilovaga kirish uchun: /app",
-            "ru": "Здравствуйте!\n🎤 Мы можем общаться голосовыми сообщениями, просто говорите чётко.\n\n📅 Создать план: /plan\n📊 Статистика и процессы: /web\n📱 Открыть мини-приложение: /app",
-            "en": "Hello!\n🎤 We can also communicate via voice messages, just speak clearly.\n\n📅 To create a plan: /plan\n📊 For statistics and progress: /web\n📱 To open the mini-app: /app"
+            "uz": "Assalomu aleykum!\n🎤 Ovozli xabarlar orqali ham muloqot qilishimiz mumkin, faqat aniq gapirsangiz bas.\n\n📅 Reja tuzish uchun: /plan\n📊 Statistika va jarayonlar uchun: /web\n📱 Mini ilovaga kirish uchun: /app\n🌐 Tilni o'zgartirish uchun: /language",
+            "ru": "Здравствуйте!\n🎤 Мы можем общаться голосовыми сообщениями, просто говорите чётко.\n\n📅 Создать план: /plan\n📊 Статистика и процессы: /web\n📱 Открыть мини-приложение: /app\n🌐 Изменить язык: /language",
+            "en": "Hello!\n🎤 We can also communicate via voice messages, just speak clearly.\n\n📅 To create a plan: /plan\n📊 For statistics and progress: /web\n📱 To open the mini-app: /app\n🌐 To change language: /language"
         }
         
         voice_text = voice_messages.get(lang, voice_messages["en"])

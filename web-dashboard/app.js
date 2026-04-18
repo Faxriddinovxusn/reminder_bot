@@ -381,10 +381,12 @@ function initChat() {
     const sendBtn = document.getElementById('chat-send-btn');
     const input = document.getElementById('chat-input');
 
-    fab.addEventListener('click', () => drawer.classList.toggle('hidden'));
-    closeBtn.addEventListener('click', () => drawer.classList.add('hidden'));
-    sendBtn.addEventListener('click', () => sendUserChat());
-    input.addEventListener('keypress', e => { if (e.key === 'Enter') sendUserChat(); });
+    if (!fab || !drawer) return;
+    
+    fab.onclick = () => drawer.classList.toggle('hidden');
+    closeBtn.onclick = () => drawer.classList.add('hidden');
+    sendBtn.onclick = () => sendUserChat();
+    input.onkeypress = e => { if (e.key === 'Enter') sendUserChat(); };
 
     document.querySelectorAll('#chat-chips .chip-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -680,10 +682,12 @@ function initAdminChat() {
     const sendBtn = document.getElementById('admin-chat-send');
     const input = document.getElementById('admin-chat-input');
 
-    fab.addEventListener('click', () => drawer.classList.toggle('hidden'));
-    closeBtn.addEventListener('click', () => drawer.classList.add('hidden'));
-    sendBtn.addEventListener('click', () => sendAdminChat());
-    input.addEventListener('keypress', e => { if (e.key === 'Enter') sendAdminChat(); });
+    if (!fab || !drawer) return;
+
+    fab.onclick = () => drawer.classList.toggle('hidden');
+    closeBtn.onclick = () => drawer.classList.add('hidden');
+    sendBtn.onclick = () => sendAdminChat();
+    input.onkeypress = e => { if (e.key === 'Enter') sendAdminChat(); };
 
     document.querySelectorAll('#admin-chat-chips .chip-btn').forEach(btn => {
         btn.addEventListener('click', () => {
