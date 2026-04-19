@@ -11,6 +11,7 @@ let currentTab = 'tasks';
 let selectedPriority = 'medium';
 let tasks = [];
 let notes = [];
+let _pollTimer = null;
 
 const offlineTranslations = {
     uz: { banner: "Offline rejim 📴", action: "Internet yo'q. Bajarilmadi 📶" },
@@ -813,6 +814,9 @@ async function initializeApp() {
     } catch (error) {
         console.error('Failed to load notes:', error);
     }
+
+    // Start real-time polling after initial load
+    _startPolling();
 }
 
 // Utility function to escape HTML
@@ -828,6 +832,75 @@ if (document.readyState === 'loading') {
 } else {
     initializeApp();
 }
+
+// ==================== REAL-TIME POLLING ====================
+// Silently syncs task status every 5 seconds.
+// Only updates the DOM elements that actually changed — no full re-render,
+// so the user won't see any flicker or scroll jump.
+async function _silentSyncTasks() {
+    if (!navigator.onLine) return;
+    try {
+        const fresh = await loadTasks();
+        if (!fresh || fresh.length === 0) return;
+
+        let hasChanges = false;
+
+        fresh.forEach(freshTask => {
+            const existing = tasks.find(t => t.id === freshTask.id);
+            if (!existing) {
+                // New task added from elsewhere — do a full reload
+                hasChanges = true;
+                return;
+            }
+            if (existing.done !== freshTask.done) {
+                // Only the status changed — update in-memory and DOM surgically
+                existing.done = freshTask.done;
+                const el = document.getElementById(`task-${freshTask.id}`);
+                if (el) {
+                    const checkbox = el.querySelector('.task-checkbox');
+                    if (freshTask.done) {
+                        el.classList.add('done');
+                        if (checkbox) checkbox.innerHTML = '✅';
+                    } else {
+                        el.classList.remove('done');
+                        if (checkbox) checkbox.innerHTML = '';
+                    }
+                }
+            }
+        });
+
+        // Check for deleted tasks
+        if (tasks.length !== fresh.length) hasChanges = true;
+
+        if (hasChanges) {
+            tasks = fresh;
+            renderTasks();
+        }
+    } catch (e) {
+        // Silent fail — don't disturb the user
+        console.warn('Silent sync failed:', e);
+    }
+}
+
+function _startPolling() {
+    if (_pollTimer) return;
+    // Small initial delay so it doesn't fire immediately after page load
+    _pollTimer = setInterval(_silentSyncTasks, 5000);
+}
+
+function _stopPolling() {
+    if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
+// Pause polling when tab is not visible (saves battery/requests)
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        _stopPolling();
+    } else {
+        _silentSyncTasks(); // Immediate refresh on tab focus
+        _startPolling();
+    }
+});
 
 // Handle tab switching to update stats/archive
 tabBtns.forEach((btn) => {

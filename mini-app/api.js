@@ -20,9 +20,18 @@ function hideLoading() {
 
 // Helper function for API requests with error handling
 async function apiRequest(endpoint, options = {}) {
-    const url = `${BASE_URL}${endpoint}`;
+    // Add cache-busting for GET requests so we always get fresh data
+    const method = options.method || 'GET';
+    let finalEndpoint = endpoint;
+    if (method === 'GET') {
+        const sep = endpoint.includes('?') ? '&' : '?';
+        finalEndpoint = endpoint + sep + 't=' + Date.now();
+    }
+    
+    const url = `${BASE_URL}${finalEndpoint}`;
     const headers = {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store',
         ...options.headers,
     };
     
@@ -37,6 +46,7 @@ async function apiRequest(endpoint, options = {}) {
         const response = await fetch(url, {
             ...options,
             headers,
+            cache: 'no-store',
         });
         
         if (!response.ok) {
