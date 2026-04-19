@@ -175,6 +175,8 @@ async def check_reminders(application) -> None:
                         chat_id=user["telegram_id"],
                         text=text
                     )
+                    from bot.models.user import log_command_to_history
+                    await log_command_to_history(user["telegram_id"], f"[Vazifa eslatmasi ({task['title']})]", text)
                     await db.tasks.update_one({"_id": task["_id"]}, {"$set": {"arrival_sent": True}})
             except Exception as e:
                 logging.exception("check_reminders arrival loop error: %s", e)
@@ -242,11 +244,14 @@ async def send_evening_report(application) -> None:
                     InlineKeyboardButton("😴 Ertaga", callback_data="plan_tomorrow_no")
                 ]]
 
+                report_text = reports.get(lang, reports["uz"])
                 await application.bot.send_message(
                     chat_id=telegram_id,
-                    text=reports.get(lang, reports["uz"]),
+                    text=report_text,
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
+                from bot.models.user import log_command_to_history
+                await log_command_to_history(telegram_id, "[Avtomatik tizim xabari / Botning yuborgan xabari]", report_text)
             except Exception as e:
                 logging.error(f"Evening report error for {user.get('telegram_id')}: {e}")
     except Exception as e:
@@ -340,11 +345,14 @@ async def send_weekly_report(application) -> None:
                     [InlineKeyboardButton("\U0001f5d3 Oylik reja", callback_data="plan_type_monthly")]
                 ]
 
+                report_text = reports.get(lang, reports["uz"])
                 await application.bot.send_message(
                     chat_id=telegram_id,
-                    text=reports.get(lang, reports["uz"]),
+                    text=report_text,
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
+                from bot.models.user import log_command_to_history
+                await log_command_to_history(telegram_id, "[Avtomatik tizim xabari / Haftalik hisobot]", report_text)
             except Exception as e:
                 logging.error(f"Weekly report error for {user.get('telegram_id')}: {e}")
     except Exception as e:
@@ -407,11 +415,14 @@ async def send_monthly_report(application) -> None:
                     [InlineKeyboardButton("🗓 Oylik reja", callback_data="plan_type_monthly")]
                 ]
 
+                report_text = reports.get(lang, reports["uz"])
                 await application.bot.send_message(
                     chat_id=telegram_id,
-                    text=reports.get(lang, reports["uz"]),
+                    text=report_text,
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
+                from bot.models.user import log_command_to_history
+                await log_command_to_history(telegram_id, "[Avtomatik tizim xabari / Oylik hisobot]", report_text)
             except Exception as e:
                 logging.error(f"Monthly report error for {user.get('telegram_id')}: {e}")
     except Exception as e:
