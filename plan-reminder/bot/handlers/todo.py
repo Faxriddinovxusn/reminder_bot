@@ -1589,10 +1589,6 @@ Bajarilgan ishlar:
 Qoldirilgan:
 {skip_list}
 
-Qo'shimcha ishlar:
-📝 {response_1}
-➕ {response_2}
-
 🤖 Xulosa:
 {summary}""",
             "ru": f"""🌙 Итоги дня
@@ -1607,10 +1603,6 @@ Qo'shimcha ishlar:
 Пропущено:
 {skip_list}
 
-Дополнительно:
-📝 {response_1}
-➕ {response_2}
-
 🤖 Итог:
 {summary}""",
             "en": f"""🌙 Daily Report
@@ -1624,10 +1616,6 @@ Completed:
 
 Skipped:
 {skip_list}
-
-Extra work:
-📝 {response_1}
-➕ {response_2}
 
 🤖 Summary:
 {summary}"""

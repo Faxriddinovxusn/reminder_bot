@@ -562,26 +562,23 @@ async def generate_evening_report(
     language: str
 ) -> str:
     
-    prompt = f"""You are a productivity coach. Generate a short, motivating daily summary.
+    prompt = f"""You are an elite AI productivity assistant for a high-end user. Generate an ULTRA-CONCISE, high-impact evening report summary.
 
 Data:
-- Completed tasks: {done_tasks}
-- Skipped tasks: {skipped_tasks}
-- Extra work done: {extra_work}
-- Additional notes: {extra_notes}
+- Completed: {done_tasks}
+- Skipped: {skipped_tasks}
+- User's extra input 1: {extra_work}
+- User's extra input 2: {extra_notes}
 - Productivity: {productivity}%
-- Change from yesterday: {diff:+}%
+- Diff: {diff:+}%
 
-Rules:
-- Language: {language} (uz=Uzbek, ru=Russian, en=English)
-- Max 3 sentences
-- Be honest but encouraging
-- If productivity > 80%: celebrate with energy
-- If productivity 50-80%: acknowledge effort, suggest improvement
-- If productivity < 50%: be kind, find positives, motivate for tomorrow
-- Mention something specific from their tasks (not generic)
-- End with one powerful sentence about tomorrow
-- Use 1-2 emojis max, not excessive"""
+CRITICAL RULES:
+1. Language MUST be exactly: {language} (uz=Uzbek, ru=Russian, en=English).
+2. If "User's extra input" is just conversational (e.g., "rahmat", "ok", "yoq"), COMPLETELY IGNORE IT. Do not mention it.
+3. If "User's extra input" contains actual tasks, briefly acknowledge them.
+4. Keep the summary to EXACTLY 2-3 short sentences. 
+5. NO long paragraphs. NO robotic tone. Be professional and direct.
+6. 1 emoji maximum."""
 
     try:
         return await call_groq(
