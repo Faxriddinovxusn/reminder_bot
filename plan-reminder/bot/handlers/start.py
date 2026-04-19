@@ -101,11 +101,15 @@ async def web_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         }
         
         keyboard = [[InlineKeyboardButton("💻 Vebsayt (Dashboard)", url=dash_url)]]
+        response_text = texts.get(lang, texts["uz"])
         await update.message.reply_text(
-            text=texts.get(lang, texts["uz"]),
+            text=response_text,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        
+        from bot.models.user import log_command_to_history
+        await log_command_to_history(user.id, "/web", response_text)
     except Exception as e:
         logging.exception("web_command error: %s", e)
         if update.message:
@@ -127,11 +131,15 @@ async def app_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         }
         
         keyboard = [[InlineKeyboardButton("📱 Mini Ilova", web_app=WebAppInfo(url=MINI_APP_URL))]]
+        response_text = texts.get(lang, texts["uz"])
         await update.message.reply_text(
-            text=texts.get(lang, texts["uz"]),
+            text=response_text,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        
+        from bot.models.user import log_command_to_history
+        await log_command_to_history(user.id, "/app", response_text)
     except Exception as e:
         logging.exception("app_command error: %s", e)
         if update.message:
@@ -157,7 +165,11 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "en": "You can now chat with me freely! 😊 If you want to create a plan, press /plan."
         }
         
-        await update.message.reply_text(texts.get(lang, texts["uz"]))
+        response_text = texts.get(lang, texts["uz"])
+        await update.message.reply_text(response_text)
+        
+        from bot.models.user import log_command_to_history
+        await log_command_to_history(user.id, "/free", response_text)
     except Exception as e:
         logging.exception("free_command error: %s", e)
         if update.message:

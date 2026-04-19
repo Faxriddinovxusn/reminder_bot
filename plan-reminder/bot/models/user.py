@@ -14,6 +14,19 @@ def calculate_segment(interaction_count: int) -> str:
     else:
         return "power_user"
 
+async def log_command_to_history(telegram_id: int, command: str, bot_reply: str) -> None:
+    db = get_db()
+    user = await get_user_by_telegram_id(telegram_id)
+    if not user:
+        return
+    history = user.get("chat_history", [])
+    history.append({"role": "user", "content": command})
+    history.append({"role": "assistant", "content": bot_reply})
+    await db[USERS_COLL].update_one(
+        {"telegram_id": telegram_id}, 
+        {"$set": {"chat_history": history[-10:]}}
+    )
+
 
 async def ensure_user_profile_fields(
     telegram_id: int,

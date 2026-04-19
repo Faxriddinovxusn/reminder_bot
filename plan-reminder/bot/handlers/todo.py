@@ -539,7 +539,11 @@ async def plan_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             [InlineKeyboardButton("📆 Haftalik reja", callback_data="plan_type_weekly")],
             [InlineKeyboardButton("🗓 Oylik reja", callback_data="plan_type_monthly")]
         ]
-        await update.message.reply_text(msgs.get(lang, msgs["uz"]), reply_markup=InlineKeyboardMarkup(keyboard))
+        response_text = msgs.get(lang, msgs["uz"])
+        await update.message.reply_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard))
+        
+        from bot.models.user import log_command_to_history
+        await log_command_to_history(user.id, "/plan", response_text)
     except Exception as e:
         logging.exception("plan_command error: %s", e)
 
