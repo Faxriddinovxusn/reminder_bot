@@ -179,7 +179,7 @@ UNKNOWN SITUATIONS:
 - If you completely fail to understand the user's intent (i.e. they are just babbling or you don't know what to do), DO NOT GUESS!
 - Instead, output EXACTLY this JSON and nothing else:
 ```json
-{ "action": "unknown_intent" }
+{{ "action": "unknown_intent" }}
 ```
 NEVER get stuck. Always respond intelligently.
 NEVER repeat same response twice in a row.

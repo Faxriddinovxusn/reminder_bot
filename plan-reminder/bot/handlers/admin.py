@@ -82,6 +82,57 @@ async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         except Exception:
             pass
 
+async def admin_see(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        if not await is_admin(update):
+            return
+        if not update.message:
+            return
+        
+        await update.message.reply_text("Ma'lumotlar yig'ilmoqda... Bu biroz vaqt olishi mumkin ⏳")
+        
+        db = get_db()
+        users = await db.users.find({}).to_list(length=10000)
+        
+        total_users = len(users)
+        segments = {"new": 0, "active": 0, "power_user": 0}
+        languages = {"uz": 0, "ru": 0, "en": 0}
+        total_interactions = 0
+        
+        for u in users:
+            seg = u.get("segment", "new")
+            segments[seg] = segments.get(seg, 0) + 1
+            
+            lang = u.get("language", "uz")
+            languages[lang] = languages.get(lang, 0) + 1
+            
+            total_interactions += u.get("interaction_count", 0)
+            
+        avg_interactions = round(total_interactions / total_users, 1) if total_users > 0 else 0
+        
+        # Prepare data for AI
+        data_summary = f"""
+Siz botning asosiy admini uchun umumiy hisobot tayyorlab beruvchi AI siz.
+Mana botdagi barcha foydalanuvchilarning umumlashtirilgan statistikasi:
+- Umumiy foydalanuvchilar soni: {total_users}
+- Faollik bo'yicha: Yangi ({segments.get('new', 0)}), Faol ({segments.get('active', 0)}), Juda faol ({segments.get('power_user', 0)})
+- Tillari: O'zbek ({languages.get('uz',0)}), Rus ({languages.get('ru',0)}), Ingliz ({languages.get('en',0)})
+- O'rtacha xabarlar soni har bir userga: {avg_interactions}
+
+Iltimos, ushbu ma'lumotlarga asoslanib, adminga botning joriy holati haqida qisqa, tushunarli va professional tahliliy hisobot (summary) yozib bering. Userlar holatini yaxshilash uchun bitta qisqa maslahat ham bering.
+"""
+        from bot.services.ai import get_ai_response
+        ai_reply = await get_ai_response(data_summary, "uz", [])
+        
+        await send_chunked_text(update, f"📊 AI Hisoboti:\n\n{ai_reply}")
+    except Exception as e:
+        logging.exception("admin_see error: %s", e)
+        try:
+            if update.message:
+                await update.message.reply_text("Xatolik yuz berdi.")
+        except Exception:
+            pass
+
 async def user_detail_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         if not await is_admin(update):
@@ -247,29 +298,18 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     except Exception as e:
         logging.exception("admin_stats error: %s", e)
 
-async def admin_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def admin_send(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         if not await is_admin(update):
             return
         if not update.message:
             return
-        if not context.args:
-            await update.message.reply_text("Usage: /broadcast [xabar matni]")
-            return
-        
-        message_text = " ".join(context.args)
-        db = get_db()
-        users = await db.users.find({}).to_list(length=10000)
-        count = 0
-        for user in users:
-            try:
-                await context.bot.send_message(chat_id=user["telegram_id"], text=message_text)
-                count += 1
-            except Exception:
-                pass
-        await update.message.reply_text(f"✅ Xabar {count} ta foydalanuvchiga yuborildi.")
+            
+        from bot.models.state import set_state
+        await set_state(update.effective_user.id, "admin_awaiting_broadcast")
+        await update.message.reply_text("📣 Barcha foydalanuvchilarga yubormoqchi bo'lgan xabaringizni yozing:")
     except Exception as e:
-        logging.exception("admin_broadcast error: %s", e)
+        logging.exception("admin_send error: %s", e)
 
 async def admin_add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
@@ -328,36 +368,10 @@ async def admin_promo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             return
         if not update.message:
             return
-        if not context.args:
-            await update.message.reply_text("Usage: /promo [code] [discount_percent] [max_uses] [valid_days]\nMasalan: /promo Yoz20 20 100 30")
-            return
             
-        if len(context.args) < 4:
-            await update.message.reply_text("Barcha parametrlarni kiriting.")
-            return
-            
-        code = context.args[0].upper()
-        discount = int(context.args[1])
-        max_uses = int(context.args[2])
-        days = int(context.args[3])
-        
-        from datetime import timedelta
-        valid_until = datetime.utcnow() + timedelta(days=days)
-        
-        db = get_db()
-        await db.promos.update_one(
-            {"code": code},
-            {"$set": {
-                "code": code,
-                "discount_percent": discount,
-                "max_uses": max_uses,
-                "used_count": 0,
-                "valid_until": valid_until,
-                "created_at": datetime.utcnow()
-            }},
-            upsert=True
-        )
-        await update.message.reply_text(f"✅ Promokod yaratildi: {code}\nChegirma: {discount}%\nMaksimal foydalanish: {max_uses}\nMuddat: {days} kun")
+        from bot.models.state import set_state
+        await set_state(update.effective_user.id, "admin_awaiting_promo_code")
+        await update.message.reply_text("🎟 Promokod nomini kiriting (masalan: YOZ20):")
     except Exception as e:
         logging.exception("admin_promo error: %s", e)
 
@@ -413,29 +427,18 @@ async def admin_paid_all(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             pass
 
 
-async def admin_set_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def admin_change_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         if not await is_admin(update):
             return
         if not update.message:
             return
-        if not context.args:
-            await update.message.reply_text("Usage: /setprice [amount]\nMasalan: /setprice 20000")
-            return
-        try:
-            amount = int(context.args[0])
-        except ValueError:
-            await update.message.reply_text("❌ Noto'g'ri raqam. Masalan: /setprice 20000")
-            return
-        db = get_db()
-        await db.settings.update_one(
-            {"key": "subscription_price"},
-            {"$set": {"key": "subscription_price", "value": amount}},
-            upsert=True
-        )
-        await update.message.reply_text(f"✅ Narx yangilandi: {amount:,} so'm")
+            
+        from bot.models.state import set_state
+        await set_state(update.effective_user.id, "admin_awaiting_price")
+        await update.message.reply_text("💵 Obuna narxini qancha qilib qo'ymoqchisiz?\nIltimos, faqat raqam kiriting (masalan: 20000).")
     except Exception as e:
-        logging.exception("admin_set_price error: %s", e)
+        logging.exception("admin_change_price error: %s", e)
         try:
             if update.message:
                 await update.message.reply_text("An error occurred.")
