@@ -24,9 +24,9 @@ from bot.handlers.todo import (
 from bot.handlers.admin import (
     users_command as admin_users, 
     user_detail_command as admin_user_detail, 
-    admin_segment, admin_custdev, admin_stats, admin_broadcast, 
+    admin_segment, admin_custdev, admin_stats, 
     admin_add_admin, admin_remove_admin, admin_promo,
-    admin_free_all, admin_paid_all, admin_set_price,
+    admin_free_all, admin_paid_all, admin_change_price,
     admin_free_user, admin_paid_user, admin_help,
     admin_see, admin_send, admin_cancel
 )
@@ -562,7 +562,6 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("users", admin_users))
     app.add_handler(CommandHandler("user", admin_user_detail))
     app.add_handler(CommandHandler("stats", admin_stats))
-    app.add_handler(CommandHandler("broadcast", admin_broadcast))
     app.add_handler(CommandHandler("addadmin", admin_add_admin))
     app.add_handler(CommandHandler("removeadmin", admin_remove_admin))
     app.add_handler(CommandHandler("promo", admin_promo))
@@ -570,13 +569,12 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("custdev", admin_custdev))
     app.add_handler(CommandHandler("freeall", admin_free_all))
     app.add_handler(CommandHandler("paidall", admin_paid_all))
-    app.add_handler(CommandHandler("setprice", admin_set_price))
+    app.add_handler(CommandHandler("change_price", admin_change_price))
     app.add_handler(CommandHandler("freeuserlar", admin_free_user))
     app.add_handler(CommandHandler("paiduserlar", admin_paid_user))
     app.add_handler(CommandHandler("adminhelp", admin_help))
     app.add_handler(CommandHandler("see", admin_see))
     app.add_handler(CommandHandler("send", admin_send))
-    app.add_handler(CommandHandler("cancel", admin_cancel))
     
     app.add_handler(CallbackQueryHandler(payment_callback, pattern="^pay_"))
     app.add_handler(CallbackQueryHandler(custdev_response_handler, pattern="^custdev_answer_"))
