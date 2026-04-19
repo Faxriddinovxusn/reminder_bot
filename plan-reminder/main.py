@@ -94,7 +94,43 @@ async def check_reminders(application) -> None:
                         "ru": f'⏰ До "{task["title"]}" осталось {offset} минут. Приготовьтесь!',
                         "en": f'⏰ {offset} minutes left until "{task["title"]}". Get ready!'
                     }
-                    await application.bot.send_message(chat_id=user["telegram_id"], text=msgs.get(lang, msgs["uz"]))
+                    text = msgs.get(lang, msgs["uz"])
+
+                    # Previous scheduled task (if any)
+                    prev_task_cur = await db.tasks.find({
+                        "user_id": task["user_id"],
+                        "date": task["date"],
+                        "scheduled_time": {"$lt": scheduled.astimezone(timezone.utc).replace(tzinfo=None)},
+                        "is_recurring": {"$ne": True}
+                    }).sort("scheduled_time", -1).to_list(length=1)
+                    
+                    prev_task = prev_task_cur[0] if prev_task_cur else None
+
+                    keyboard = []
+                    if prev_task and prev_task.get("status") == "pending":
+                        prev_options = {
+                            "uz": f"\n\n\"{prev_task['title']}\" ni bajardingizmi?",
+                            "ru": f"\n\nВыполнили \"{prev_task['title']}\"?",
+                            "en": f"\n\nDid you complete \"{prev_task['title']}\"?",
+                        }
+                        text += prev_options.get(lang, prev_options["uz"])
+                        prev_id = str(prev_task["_id"])
+                        keyboard = [
+                            [
+                                InlineKeyboardButton("✅ Bajarildi", callback_data=f"task_status_done_{prev_id}"),
+                                InlineKeyboardButton("🔄 Jarayonda", callback_data=f"task_status_inprogress_{prev_id}")
+                            ],
+                            [
+                                InlineKeyboardButton("❌ B.qilindi", callback_data=f"task_status_skipped_{prev_id}"),
+                                InlineKeyboardButton("⏰ Vaqtni suring", callback_data=f"task_status_postponed_{prev_id}")
+                            ]
+                        ]
+                        
+                    await application.bot.send_message(
+                        chat_id=user["telegram_id"], 
+                        text=text,
+                        reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+                    )
                     await db.tasks.update_one({"_id": task["_id"]}, {"$set": {"reminder_sent": True}})
             except Exception as e:
                 logging.exception("check_reminders reminder loop error: %s", e)
@@ -135,40 +171,9 @@ async def check_reminders(application) -> None:
                     mot = random.choice(motivations.get(lang, motivations["uz"]))
                     text = f"🔔 Soat {task_time_str}. \"{task['title']}\" vaqti keldi! 💪 {mot}"
 
-                    # Previous scheduled task (if any)
-                    prev_task_cur = await db.tasks.find({
-                        "user_id": task["user_id"],
-                        "date": task["date"],
-                        "scheduled_time": {"$lt": scheduled.astimezone(timezone.utc).replace(tzinfo=None)},
-                        "is_recurring": {"$ne": True}
-                    }).sort("scheduled_time", -1).to_list(length=1)
-                    
-                    prev_task = prev_task_cur[0] if prev_task_cur else None
-
-                    keyboard = []
-                    if prev_task and prev_task.get("status") == "pending":
-                        prev_options = {
-                            "uz": f"\n\n\"{prev_task['title']}\" ni bajardingizmi?",
-                            "ru": f"\n\nВыполнили \"{prev_task['title']}\"?",
-                            "en": f"\n\nDid you complete \"{prev_task['title']}\"?",
-                        }
-                        text += prev_options.get(lang, prev_options["uz"])
-                        prev_id = str(prev_task["_id"])
-                        keyboard = [
-                            [
-                                InlineKeyboardButton("✅ Bajarildi", callback_data=f"task_status_done_{prev_id}"),
-                                InlineKeyboardButton("🔄 Jarayonda", callback_data=f"task_status_inprogress_{prev_id}")
-                            ],
-                            [
-                                InlineKeyboardButton("❌ B.qilindi", callback_data=f"task_status_skipped_{prev_id}"),
-                                InlineKeyboardButton("⏰ Vaqtni suring", callback_data=f"task_status_postponed_{prev_id}")
-                            ]
-                        ]
-                    
                     await application.bot.send_message(
                         chat_id=user["telegram_id"],
-                        text=text,
-                        reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+                        text=text
                     )
                     await db.tasks.update_one({"_id": task["_id"]}, {"$set": {"arrival_sent": True}})
             except Exception as e:

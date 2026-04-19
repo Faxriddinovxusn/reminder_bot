@@ -218,7 +218,14 @@ async function api(path, method = 'GET', body = null) {
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     const opts = { method, headers };
     if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(`${API_BASE}${path}`, opts);
+    
+    // Prevent caching for GET requests
+    let url = `${API_BASE}${path}`;
+    if (method === 'GET') {
+        url += (url.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
+    }
+    
+    const res = await fetch(url, opts);
     if (res.status === 401) { doLogout(); throw new Error('Unauthorized'); }
     return res.json();
 }
