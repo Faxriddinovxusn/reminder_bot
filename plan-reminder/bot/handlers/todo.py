@@ -955,7 +955,7 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
         from bot.models.user import calculate_segment
-        new_count = db_user.get("interaction_count", 0) + 1
+        new_count = int(db_user.get("interaction_count", 0) or 0) + 1
         new_segment = calculate_segment(new_count)
 
         if profile_update:
