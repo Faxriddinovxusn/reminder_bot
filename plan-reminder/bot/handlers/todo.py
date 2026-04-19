@@ -731,6 +731,104 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user_message_to_ai = user_message
         
         if is_admin_user:
+            if current_state == "admin_awaiting_broadcast":
+                from bot.services.db import get_db
+                import asyncio
+                
+                await update.message.reply_text("⏳ Xabarni yuborish boshlandi. Iltimos kuting...")
+                await clear_state(tg_id)
+                
+                async def broadcast_task(text):
+                    db_local = get_db()
+                    users_cur = await db_local.users.find({}).to_list(length=15000)
+                    count = 0
+                    for u in users_cur:
+                        try:
+                            await context.bot.send_message(chat_id=u["telegram_id"], text=text)
+                            count += 1
+                            await asyncio.sleep(0.05)  # Max 20 messages per second
+                        except Exception:
+                            pass
+                    try:
+                        await context.bot.send_message(chat_id=tg_id, text=f"✅ Xabar hamma {count} ta odamga yetib bordi!")
+                    except Exception:
+                        pass
+                
+                asyncio.create_task(broadcast_task(user_message))
+                return
+                
+            elif current_state == "admin_awaiting_price":
+                try:
+                    amount = int(user_message.strip())
+                    from bot.services.db import get_db
+                    await get_db().settings.update_one(
+                        {"key": "subscription_price"},
+                        {"$set": {"key": "subscription_price", "value": amount}},
+                        upsert=True
+                    )
+                    await clear_state(tg_id)
+                    await update.message.reply_text(f"✅ Narx yangilandi: {amount:,} so'm")
+                except ValueError:
+                    await update.message.reply_text("❌ Noto'g'ri raqam. Iltimos, faqat raqam kiriting (masalan: 20000).")
+                return
+                
+            elif current_state == "admin_awaiting_promo_code":
+                code = user_message.strip().upper()
+                await set_state(tg_id, "admin_awaiting_promo_discount", promo_code=code)
+                await update.message.reply_text("💯 Yaxshi! Endi chegirma foizini kiriting (faqat raqam, masalan: 20):")
+                return
+                
+            elif current_state == "admin_awaiting_promo_discount":
+                try:
+                    discount = int(user_message.strip())
+                    code = state_doc.get("promo_code")
+                    await set_state(tg_id, "admin_awaiting_promo_uses", promo_code=code, promo_discount=discount)
+                    await update.message.reply_text("👥 Ajoyib! Bu promokoddan maksimal necha marta foydalanish mumkin? (masalan: 100):")
+                except ValueError:
+                    await update.message.reply_text("❌ Noto'g'ri raqam. Iltimos, faqat raqam kiriting (masalan: 20).")
+                return
+                
+            elif current_state == "admin_awaiting_promo_uses":
+                try:
+                    uses = int(user_message.strip())
+                    code = state_doc.get("promo_code")
+                    discount = state_doc.get("promo_discount")
+                    await set_state(tg_id, "admin_awaiting_promo_days", promo_code=code, promo_discount=discount, promo_uses=uses)
+                    await update.message.reply_text("⏳ Va oxirgisi: Bu promokod necha kun amal qiladi? (masalan: 30):")
+                except ValueError:
+                    await update.message.reply_text("❌ Noto'g'ri raqam. Iltimos, faqat raqam kiriting.")
+                return
+                
+            elif current_state == "admin_awaiting_promo_days":
+                try:
+                    days = int(user_message.strip())
+                    code = state_doc.get("promo_code")
+                    discount = state_doc.get("promo_discount")
+                    uses = state_doc.get("promo_uses")
+                    
+                    from datetime import timedelta
+                    valid_until = datetime.utcnow() + timedelta(days=days)
+                    
+                    from bot.services.db import get_db
+                    await get_db().promos.update_one(
+                        {"code": code},
+                        {"$set": {
+                            "code": code,
+                            "discount_percent": discount,
+                            "max_uses": uses,
+                            "used_count": 0,
+                            "valid_until": valid_until,
+                            "created_at": datetime.utcnow()
+                        }},
+                        upsert=True
+                    )
+                    await clear_state(tg_id)
+                    await update.message.reply_text(f"✅ Promokod muvaffaqiyatli yaratildi!\n\n🎟 Kod: {code}\n📉 Chegirma: {discount}%\n👥 Limit: {uses} ta\n⏳ Amal qilish muddati: {days} kun")
+                except ValueError:
+                    await update.message.reply_text("❌ Noto'g'ri raqam. Iltimos, faqat raqam kiriting.")
+                return
+
+            # If not awaiting admin input, clear state and proceed to standard AI admin reply
             current_state = "idle"
             await clear_state(tg_id)
             user_message_to_ai = f"<system>SYSTEM INFO: Siz tizim adminiga xizmat ko'rsatyapsiz! Unga reja qilishni aytmang. Faqat uning so'rovlariga botning holati bo'yicha to'g'ri, qisqa va aniq javob bering.</system>\n\nADMIN MESSAGE: {user_message}"
@@ -926,9 +1024,9 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not is_admin_user and action_result and action_result.get("action") == "unknown_intent":
             await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
             fallback_text = {
-                "uz": "Kechirasiz, sizni yaxshi tushunmadim.\nReja tuzish uchun /plan ni bosing\nTilni o'zgartirish uchun /language\nWebsaytda statistikani ko'rish uchun /web\nMini ilovaga kirish uchun /app\nSuhbat qurish uchun /free commandini yuboring.",
-                "ru": "Извините, я вас не понял.\nНажмите /plan, чтобы составить план\nНажмите /language для смены языка\nОтправьте /web для просмотра статистики\nОтправьте /app для входа в мини-приложение\nОтправьте /free для свободного общения.",
-                "en": "Sorry, I didn't quite understand you.\nPress /plan to create a plan\nPress /language to change language\nSend /web to view statistics on website\nSend /app to open mini app\nSend /free for casual chat."
+                "uz": "Quyidagilardan birini tanlang:\n/plan — Reja tuzish\n/app — Mini ilova\n/web — Veb sayt\n/free — Erkin suhbat\n/language — Tilni o'zgartirish",
+                "ru": "Выберите одно из следующих:\n/plan — Составить план\n/app — Мини приложение\n/web — Веб сайт\n/free — Свободный чат\n/language — Изменить язык",
+                "en": "Choose one of the following:\n/plan — Create a plan\n/app — Mini app\n/web — Web dashboard\n/free — Free chat\n/language — Change language"
             }
             await update.message.reply_text(fallback_text.get(lang, fallback_text["uz"]))
             return
@@ -1071,28 +1169,67 @@ async def handle_reminder_input(update: Update, context: ContextTypes.DEFAULT_TY
             await update.message.reply_text(not_found.get(lang, not_found["uz"]))
             return True
 
-        match = re.search(r"-?\d+", update.message.text or "")
-        if not match:
+        text = (update.message.text or "").strip().lower()
+
+        # Word-based number parsing (uz/ru/en)
+        word_numbers = {
+            "bir": 1, "ikki": 2, "uch": 3, "to'rt": 4, "tort": 4, "besh": 5,
+            "olti": 6, "yetti": 7, "sakkiz": 8, "to'qqiz": 9, "toqqiz": 9, "o'n": 10, "on": 10,
+            "один": 1, "два": 2, "три": 3, "четыре": 4, "пять": 5,
+            "шесть": 6, "семь": 7, "восемь": 8, "девять": 9, "десять": 10,
+            "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+            "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+            "fifteen": 15, "twenty": 20, "thirty": 30,
+            "o'n besh": 15, "yigirma": 20, "o'ttiz": 30, "ottiz": 30,
+            "пятнадцать": 15, "двадцать": 20, "тридцать": 30,
+        }
+
+        offset = None
+
+        # First try word-based numbers
+        for word, num in sorted(word_numbers.items(), key=lambda x: -len(x[0])):
+            if word in text:
+                offset = num
+                break
+
+        # Then try numeric extraction
+        if offset is None:
+            match = re.search(r"\d+", text)
+            if match:
+                offset = int(match.group())
+
+        if offset is None:
             return False
 
-        offset = int(match.group())
-        if offset not in {0, 10, 30, 60}:
-            return False
+        # Clamp to valid range (0 = no reminder, 1-1440 = valid minutes)
+        if offset < 0:
+            offset = 0
+        elif offset > 1440:
+            offset = 1440
 
         result = await apply_plan_reminder_choice(telegram_id, offset, state_doc)
 
-        msgs = {
-            "uz": "✅ Tayyor! Vaqti kelganda eslataman 🔔",
-            "ru": "✅ Готово! Напомню вовремя 🔔",
-            "en": "✅ All set! I'll remind you on time 🔔"
-        }
+        if offset == 0:
+            confirm = {
+                "uz": "✅ Tayyor! Vazifa vaqtida eslataman 🔔",
+                "ru": "✅ Готово! Напомню в назначенное время 🔔",
+                "en": "✅ All set! I'll remind you at the scheduled time 🔔"
+            }
+        else:
+            confirm = {
+                "uz": f"✅ Tayyor! Har bir vazifadan {offset} daqiqa oldin eslataman 🔔",
+                "ru": f"✅ Готово! Напомню за {offset} минут до каждой задачи 🔔",
+                "en": f"✅ All set! I'll remind you {offset} minutes before each task 🔔"
+            }
+
         btn = {"uz": "📱 Rejalarni ko'rish", "ru": "📱 Посмотреть планы", "en": "📱 View plans"}
         keyboard = [[InlineKeyboardButton(btn.get(lang, btn["uz"]), web_app=WebAppInfo(url=MINI_APP_URL))]]
-        await update.message.reply_text(msgs.get(lang, msgs["uz"]), reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text(confirm.get(lang, confirm["uz"]), reply_markup=InlineKeyboardMarkup(keyboard))
         return True
     except Exception as e:
         logging.exception("handle_reminder_input error: %s", e)
         return True
+
 
 async def confirm_plan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
