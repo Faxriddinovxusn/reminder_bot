@@ -806,7 +806,6 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     discount = state_doc.get("promo_discount")
                     uses = state_doc.get("promo_uses")
                     
-                    from datetime import timedelta
                     valid_until = datetime.utcnow() + timedelta(days=days)
                     
                     from bot.services.db import get_db
