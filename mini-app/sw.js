@@ -4,7 +4,7 @@ const ASSETS_TO_CACHE = [
     '/index.html',
     '/style.css',
     '/app.js',
-    '/api.js',
+    '/api.js', 
     '/ai-chat.js'
 ];
 

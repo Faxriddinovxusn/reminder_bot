@@ -73,10 +73,7 @@ python main.py
 ### 3.1 Choose Hosting (Option A or B)
 
 **Option A: Simple Static Hosting (Recommended)**
-- GitHub Pages
-- Netlify  
-- Vercel
-- AWS S3 + CloudFront
+- 
 
 Files to deploy:
 - `mini-app/index.html`
