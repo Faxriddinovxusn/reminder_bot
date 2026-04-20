@@ -30,7 +30,8 @@ def start_all():
     time.sleep(3)
     
     # 2. Telegram Bot
-    print("🤖 Telegram Bot ishga tushmoqda...")
+    print("🤖 Telegram Bot ishga tushmoqda (10 soniya kutilyapti - Railway eski konteynerni o'chirishi uchun)...")
+    time.sleep(10)
     bot_proc = subprocess.Popen(
         [sys.executable, "main.py"],
         cwd=PLAN_DIR
