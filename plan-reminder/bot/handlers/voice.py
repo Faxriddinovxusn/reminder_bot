@@ -41,6 +41,7 @@ async def _transcribe_voice_httpx(file_path: str, file_name: str, api_key: str, 
                 "model": "whisper-large-v3",
                 "response_format": "json",
                 "language": language,
+                "prompt": "Salom, bu o'zbek tilidagi qisqa audio yozuv. Bugun vazifa, reja, majlis va uchrashuv bor." if language == "uz" else ""
             },
         )
         resp.raise_for_status()
@@ -106,7 +107,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             return
         
         from bot.models.state import get_state, set_state, clear_state
-        from bot.handlers.todo import update_user_profile_after_message, send_plan_confirmation_message, handle_evening_response_1, handle_evening_response_2
+        from bot.handlers.todo import update_user_profile_after_message, send_plan_confirmation_message, handle_evening_response_1
         from bot.services.ai import extract_tasks_from_text
         
         state_doc = await get_state(tg_id)
@@ -126,7 +127,8 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             return
         
         if current_state == "evening_checkin_2":
-            await handle_evening_response_2(update, context, db_user, transcribed_text)
+            # Legacy fallback: handle as step 1
+            await handle_evening_response_1(update, context, db_user, transcribed_text)
             return
         
         # Voice edit support: if user is editing a plan via voice

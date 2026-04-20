@@ -853,7 +853,8 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await handle_evening_response_1(update, context, db_user, user_message)
             return
         elif current_state == "evening_checkin_2":
-            await handle_evening_response_2(update, context, db_user, user_message)
+            # Legacy fallback: if user was stuck in old 2-step flow, handle as step 1
+            await handle_evening_response_1(update, context, db_user, user_message)
             return
         elif current_state == "custdev_answering":
             await handle_custdev_answer(update, context, db_user, user_message)
@@ -1012,16 +1013,40 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         history.append({"role": "assistant", "content": clean_ai_response})
         new_history = history[-10:]
         
-        # Intercept propose_tasks BEFORE sending normal response
+        # Intercept propose_tasks — SILENT ADD: save directly, no confirmation needed
         if not is_admin_user and action_result and action_result.get("action") == "propose_tasks":
             extracted_tasks = action_result.get("data") or []
             if extracted_tasks:
-                await set_state(tg_id, "awaiting_confirmation", pending_tasks=extracted_tasks, current_task_index=0)
-                await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
-                if clean_ai_response:
-                    await update.message.reply_text(clean_ai_response)
-                await send_plan_confirmation_message(update.message, extracted_tasks, lang)
-                return
+                saved_ids = await save_confirmed_plan_tasks(tg_id, extracted_tasks)
+                if saved_ids:
+                    # Apply default 10-min reminder to all saved tasks
+                    task_db = get_db()
+                    for sid in saved_ids:
+                        await task_db.tasks.update_one(
+                            {"_id": ObjectId(sid)},
+                            {"$set": {"reminder_offset": 10, "reminder_sent": False}}
+                        )
+                    # Build short confirmation message
+                    task_names = [t.get("title", "") for t in extracted_tasks if t.get("title")]
+                    task_times = [t.get("time", "") for t in extracted_tasks if t.get("time")]
+                    summary_parts = []
+                    for i, name in enumerate(task_names):
+                        t = task_times[i] if i < len(task_times) else ""
+                        summary_parts.append(f"• {t} — {name}" if t else f"• {name}")
+                    summary_str = "\n".join(summary_parts)
+                    confirm_msgs = {
+                        "uz": f"✅ Rejaga qo'shildi (10 daqiqa oldin eslataman):\n{summary_str}",
+                        "ru": f"✅ Добавлено в план (напомню за 10 мин):\n{summary_str}",
+                        "en": f"✅ Added to plan (will remind 10 min before):\n{summary_str}"
+                    }
+                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
+                    reply_text = confirm_msgs.get(lang, confirm_msgs["uz"])
+                    if clean_ai_response:
+                        reply_text = clean_ai_response + "\n\n" + reply_text
+                    await update.message.reply_text(reply_text)
+                    from bot.models.user import log_command_to_history
+                    await log_command_to_history(tg_id, user_message, reply_text)
+                    return
 
         # Intercept unknown_intent BEFORE sending normal response
         if not is_admin_user and action_result and action_result.get("action") == "unknown_intent":
@@ -1437,29 +1462,27 @@ async def task_status_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def handle_evening_response_1(update, context, user, message):
-    """Handle first evening check-in response: what did you do today"""
+    """Handle evening check-in response: directly generate report (no second question)"""
     try:
         telegram_id = update.effective_user.id
         lang = user.get("language", "uz")
         db = get_db()
 
-        # Save first response and move to step 2
-        await db.user_states.update_one(
-            {"telegram_id": telegram_id},
-            {"$set": {
-                "state": "evening_checkin_2",
-                "evening_response_1": message,
-                "updated_at": datetime.utcnow()
-            }}
-        )
+        # Save evening log
+        state_doc = await get_state(telegram_id)
+        await db.evening_logs.insert_one({
+            "telegram_id": telegram_id,
+            "date": state_doc.get("evening_date", datetime.utcnow().date().isoformat()),
+            "response_1": message,
+            "response_2": "",
+            "created_at": datetime.utcnow()
+        })
 
-        # Ask follow-up question
-        msgs = {
-            "uz": "Yaxshi! \ud83d\udc4d\n\nRejadan tashqari yana biron qo'shimcha ish qildingizmi?",
-            "ru": "\u041e\u0442\u043b\u0438\u0447\u043d\u043e! \ud83d\udc4d\n\n\u0421\u0434\u0435\u043b\u0430\u043b\u0438 \u0447\u0442\u043e-\u043d\u0438\u0431\u0443\u0434\u044c \u0434\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0435, \u043f\u043e\u043c\u0438\u043c\u043e \u043f\u043b\u0430\u043d\u0430?",
-            "en": "Great! \ud83d\udc4d\n\nDid you do anything extra beyond your plan?"
-        }
-        await update.message.reply_text(msgs.get(lang, msgs["uz"]))
+        # Reset state to idle immediately
+        await clear_state(telegram_id)
+
+        # Generate and send report directly (no second question)
+        await generate_and_send_report(context.bot, telegram_id, user, message, "")
     except Exception as e:
         logging.exception("handle_evening_response_1 error: %s", e)
         try:
