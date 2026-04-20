@@ -174,3 +174,36 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         logging.exception("free_command error: %s", e)
         if update.message:
             await update.message.reply_text("Biroz xatolik yuz berdi :(")
+
+async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        user = update.effective_user
+        if not user:
+            return
+            
+        db_user = await get_user_by_telegram_id(user.id)
+        lang = db_user.get("language", "uz") if db_user else "uz"
+        
+        keyboard = [
+            [InlineKeyboardButton("🇺🇿 O'zbek", callback_data="lang_uz")],
+            [InlineKeyboardButton("🇷🇺 Русский", callback_data="lang_ru")],
+            [InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        texts = {
+            "uz": "Tilni tanlang:",
+            "ru": "Выберите язык:",
+            "en": "Choose language:"
+        }
+        text = texts.get(lang, texts["uz"])
+        
+        await update.message.reply_text(text, reply_markup=reply_markup)
+        
+        from bot.models.user import log_command_to_history
+        await log_command_to_history(user.id, "/language", text)
+    except Exception as e:
+        logging.exception("language_command error: %s", e)
+        if update.message:
+            await update.message.reply_text("Biroz xatolik yuz berdi :(")
+

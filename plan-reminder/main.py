@@ -16,7 +16,7 @@ from bot.services.db import connect, get_db, close
 from bot.models.user import create_user, get_user_by_telegram_id, set_language, ensure_indexes, get_subscription_status
 from bot.models.task import create_task, get_tasks_for_user_on_date, mark_task_done
 from bot.services.ai import generate_summary
-from bot.handlers.start import start, language_callback, web_command, app_command, free_command
+from bot.handlers.start import start, language_callback, web_command, app_command, free_command, language_command
 from bot.handlers.todo import (
     plan_command, add_command, tasks_command, done_callback, ai_chat, 
     reminder_preference_callback, confirm_plan_callback, reminder_choice_callback, task_status_callback, plan_type_callback
@@ -572,6 +572,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("web", web_command))
     app.add_handler(CommandHandler("app", app_command))
     app.add_handler(CommandHandler("free", free_command))
+    app.add_handler(CommandHandler("language", language_command))
     app.add_handler(CommandHandler("plan", plan_command))
     app.add_handler(CommandHandler("add", add_command))
     app.add_handler(CommandHandler("tasks", tasks_command))

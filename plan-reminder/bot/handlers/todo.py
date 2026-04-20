@@ -1622,11 +1622,14 @@ Skipped:
         }
 
         # Send report
+        report_text = reports.get(lang, reports["uz"])
         await bot.send_message(
             chat_id=telegram_id,
-            text=reports.get(lang, reports["uz"])
+            text=report_text
         )
-
+        from bot.models.user import log_command_to_history
+        await log_command_to_history(telegram_id, "[Avtomatik tizim hisoboti / Bot yuborgan xabar]", report_text)
+        
         # Save today's report to DB for tomorrow's comparison
         await db.daily_reports.update_one(
             {"telegram_id": telegram_id, "date": today.isoformat()},
