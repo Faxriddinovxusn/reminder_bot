@@ -1011,7 +1011,6 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         history.append({"role": "user", "content": user_message})
         history.append({"role": "assistant", "content": clean_ai_response})
-        new_history = history[-10:]
         
         # Intercept propose_tasks — SILENT ADD: save directly, no confirmation needed
         if not is_admin_user and action_result and action_result.get("action") == "propose_tasks":
@@ -1039,27 +1038,27 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         "ru": f"✅ Добавлено в план (напомню за 10 мин):\n{summary_str}",
                         "en": f"✅ Added to plan (will remind 10 min before):\n{summary_str}"
                     }
-                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
                     reply_text = confirm_msgs.get(lang, confirm_msgs["uz"])
                     if clean_ai_response:
                         reply_text = clean_ai_response + "\n\n" + reply_text
+                    
+                    history[-1]["content"] = reply_text
+                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-10:]}})
                     await update.message.reply_text(reply_text)
-                    from bot.models.user import log_command_to_history
-                    await log_command_to_history(tg_id, user_message, reply_text)
                     return
 
         # Intercept unknown_intent BEFORE sending normal response
         if not is_admin_user and action_result and action_result.get("action") == "unknown_intent":
-            await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
             fallback_text = {
                 "uz": "Quyidagilardan birini tanlang:\n/plan — Reja tuzish\n/app — Mini ilova\n/web — Veb sayt\n/free — Erkin suhbat\n/language — Tilni o'zgartirish",
                 "ru": "Выберите одно из следующих:\n/plan — Составить план\n/app — Мини приложение\n/web — Веб сайт\n/free — Свободный чат\n/language — Изменить язык",
                 "en": "Choose one of the following:\n/plan — Create a plan\n/app — Mini app\n/web — Web dashboard\n/free — Free chat\n/language — Change language"
             }
-            await update.message.reply_text(fallback_text.get(lang, fallback_text["uz"]))
+            reply_text = fallback_text.get(lang, fallback_text["uz"])
+            history[-1]["content"] = reply_text
+            await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-10:]}})
+            await update.message.reply_text(reply_text)
             return
-
-        await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
 
         # Add reminder message every 4th interaction if idle
         if current_state == "idle" and new_count > 0 and new_count % 4 == 0:
@@ -1069,7 +1068,9 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 "en": "\n\n📌 Press /plan to schedule your day!"
             }
             clean_ai_response += reminder_text.get(lang, reminder_text["uz"])
+            history[-1]["content"] = clean_ai_response
 
+        await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-10:]}})
         await update.message.reply_text(clean_ai_response)
     except Exception as e:
         logging.exception("ai_chat error: %s", e)
