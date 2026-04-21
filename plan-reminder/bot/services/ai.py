@@ -125,7 +125,7 @@ async def call_groq(
 
 SYSTEM_PROMPT = """You are PlanAI — a smart, warm, and highly capable personal productivity assistant.
 
-CURRENT TIME: {current_time}, DATE: {current_date} (Tashkent UTC+5)
+CURRENT TIME: {current_time} (Exact HH:MM), DATE: {current_date} (Tashkent UTC+5)
 USER LANGUAGE: {language}
 
 ═══ RULE 1: STRICT LANGUAGE & FLAWLESS GRAMMAR (ABSOLUTE HIGHEST PRIORITY) ═══
@@ -243,7 +243,8 @@ Example for PROPOSING tasks to add (use 24h format for time):
 ```
 CRITICAL DATE & REMINDER RULES:
 - "target_date": Calculate the exact YYYY-MM-DD if the user says "ertaga", "indinga" or mentions a specific date. If the user doesn't mention a specific date, output null for "target_date".
-- "reminder_offset": If the user says "5 daqiqa oldin eslat", set this to 5. If "yarim soat oldin", set to 30. If the user DOES NOT mention an explicit reminder time, ALWAYS set "reminder_offset" to 10 by default.
+- "time": If the user says a relative time like "30 daqiqadan keyin", YOU MUST ADD 30 minutes to the CURRENT TIME ({current_time}) and output the exact absolute time in HH:MM format. NEVER write "30 daqiqadan keyin" in the time field.
+- "reminder_offset": If the user says "5 daqiqa oldin eslat" (remind me 5 mins before), set this to 5. If they say "uxlashimdan 10 daqiqa oldin", set this to 10. If the user DOES NOT mention an explicit reminder time, ALWAYS set "reminder_offset" to 10 by default.
 
 Example for DELETING a task:
 "Vazifa o'chirildi."
@@ -457,11 +458,13 @@ async def extract_tasks_from_text(text: str, language: str, user_habits: list = 
         period_hint = period_instructions.get(plan_type, "")
 
         tashkent_now = datetime.now(timezone(timedelta(hours=5)))
+        current_time_str = tashkent_now.strftime("%H:%M")
         today_iso = tashkent_now.date().isoformat()
         tomorrow_iso = (tashkent_now.date() + timedelta(days=1)).isoformat()
 
         prompt = f"""STRICT TASK DETECTION ({plan_type.upper()} PLAN):
 CURRENT DATE INFO: Today is {today_iso}, Tomorrow is {tomorrow_iso}. Timezone: Tashkent UTC+5.
+CURRENT EXACT TIME: {current_time_str}
 Before extracting tasks, check if the message is valid for task extraction.
 Extract tasks ONLY if the message contains BOTH:
 1. A clear action/verb (e.g., do, go, eat, run, meet, call)
@@ -491,6 +494,7 @@ Rules:
 - Detect language and understand uz/ru/en input
 - If any task is missing a time, return an empty array [] so the bot can ask for the time later.
 - If user mentions a specific day (ertaga, indinga), calculate the exact YYYY-MM-DD for "target_date". Otherwise, set "target_date" to null.
+- "time": If user says relative time ("yarm soatdan keyin", "in 2 hours"), ADD that amount to the CURRENT EXACT TIME ({current_time_str}) and return ONLY the absolute HH:MM string.
 - If user explicitly requests a custom reminder time (e.g., "5 daqiqa oldin"), set "reminder_offset" to that integer value in minutes (e.g., 5). If they don't mention a reminder offset, default to 10.
 
 Text: {text}"""

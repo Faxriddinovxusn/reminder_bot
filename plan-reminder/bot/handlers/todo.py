@@ -1067,9 +1067,9 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Intercept unknown_intent BEFORE sending normal response
         if not is_admin_user and action_result and action_result.get("action") == "unknown_intent":
             fallback_text = {
-                "uz": "Quyidagilardan birini tanlang:\n/plan — Reja tuzish\n/app — Mini ilova\n/web — Veb sayt\n/free — Erkin suhbat\n/language — Tilni o'zgartirish",
-                "ru": "Выберите одно из следующих:\n/plan — Составить план\n/app — Мини приложение\n/web — Веб сайт\n/free — Свободный чат\n/language — Изменить язык",
-                "en": "Choose one of the following:\n/plan — Create a plan\n/app — Mini app\n/web — Web dashboard\n/free — Free chat\n/language — Change language"
+                "uz": "Kechirasiz, gapingizni tushuna olmadim, Iltimos qaytadan ravon gapirishingizni iltimos qilaman.",
+                "ru": "Извините, я вас не понял. Пожалуйста, говорите яснее.",
+                "en": "Sorry, I didn't quite understand you. Please speak more clearly."
             }
             reply_text = fallback_text.get(lang, fallback_text["uz"])
             history[-1]["content"] = reply_text
