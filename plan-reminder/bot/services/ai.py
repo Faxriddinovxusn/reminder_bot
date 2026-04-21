@@ -242,6 +242,7 @@ Example for PROPOSING tasks to add (use 24h format for time):
 }}
 ```
 CRITICAL DATE & REMINDER RULES:
+- "title": STRICT ACCURACY. The task title MUST EXACTLY reflect the user's requested action. If the user says "uxlash" (sleep), the title must be "Uxlash". NEVER hallucinate or change the meaning. NEVER output "Uchrashuv" unless the user explicitly said "uchrashuv".
 - "target_date": Calculate the exact YYYY-MM-DD if the user says "ertaga", "indinga" or mentions a specific date. If the user doesn't mention a specific date, output null for "target_date".
 - "time": If the user says a relative time like "30 daqiqadan keyin", YOU MUST ADD 30 minutes to the CURRENT TIME ({current_time}) and output the exact absolute time in HH:MM format. NEVER write "30 daqiqadan keyin" in the time field.
 - "reminder_offset": If the user says "5 daqiqa oldin eslat" (remind me 5 mins before), set this to 5. If they say "uxlashimdan 10 daqiqa oldin", set this to 10. If the user DOES NOT mention an explicit reminder time, ALWAYS set "reminder_offset" to 10 by default.
@@ -488,6 +489,7 @@ Return ONLY a valid JSON array, nothing else:
 [{{ "title": "task name", "time": "HH:MM", "priority": "high/normal/low", "is_recurring": false, "target_date": "YYYY-MM-DD", "reminder_offset": 10 }}]
 
 Rules:
+- STRICT ACCURACY: The task title MUST EXACTLY reflect the user's requested action. If the user says "uxlash" (sleep), the title must be "Uxlash". NEVER hallucinate or change the meaning. NEVER output "Uchrashuv" unless the user explicitly said "uchrashuv".
 - Fix ALL spelling and grammatical mistakes in task titles. Task titles must be flawlessly written in the target language.
 - Keep task titles short, simple, concise, and clear. Avoid any unnecessary long words.
 - If user says "har kuni" or "every day" → is_recurring: true
