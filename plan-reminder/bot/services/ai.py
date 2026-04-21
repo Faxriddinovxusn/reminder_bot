@@ -231,10 +231,19 @@ Example for PROPOSING tasks to add (use 24h format for time):
 {{
   "action": "propose_tasks",
   "data": [
-    {{"title": "Ishga borish", "time": "09:00", "priority": "high"}}
+    {{
+      "title": "Ishga borish", 
+      "time": "09:00", 
+      "priority": "high", 
+      "target_date": "2026-05-20", 
+      "reminder_offset": 10
+    }}
   ]
 }}
 ```
+CRITICAL DATE & REMINDER RULES:
+- "target_date": Calculate the exact YYYY-MM-DD if the user says "ertaga", "indinga" or mentions a specific date. If the user doesn't mention a specific date, output null for "target_date".
+- "reminder_offset": If the user says "5 daqiqa oldin eslat", set this to 5. If "yarim soat oldin", set to 30. If the user DOES NOT mention an explicit reminder time, ALWAYS set "reminder_offset" to 10 by default.
 
 Example for DELETING a task:
 "Vazifa o'chirildi."
@@ -447,7 +456,12 @@ async def extract_tasks_from_text(text: str, language: str, user_habits: list = 
         }
         period_hint = period_instructions.get(plan_type, "")
 
+        tashkent_now = datetime.now(timezone(timedelta(hours=5)))
+        today_iso = tashkent_now.date().isoformat()
+        tomorrow_iso = (tashkent_now.date() + timedelta(days=1)).isoformat()
+
         prompt = f"""STRICT TASK DETECTION ({plan_type.upper()} PLAN):
+CURRENT DATE INFO: Today is {today_iso}, Tomorrow is {tomorrow_iso}. Timezone: Tashkent UTC+5.
 Before extracting tasks, check if the message is valid for task extraction.
 Extract tasks ONLY if the message contains BOTH:
 1. A clear action/verb (e.g., do, go, eat, run, meet, call)
@@ -468,7 +482,7 @@ Examples:
 Extract tasks from this text based on the rules. Fix any typos automatically.
 {habit_hint}
 Return ONLY a valid JSON array, nothing else:
-[{{ "title": "task name", "time": "HH:MM", "priority": "high/normal/low", "is_recurring": false }}]
+[{{ "title": "task name", "time": "HH:MM", "priority": "high/normal/low", "is_recurring": false, "target_date": "YYYY-MM-DD", "reminder_offset": 10 }}]
 
 Rules:
 - Fix ALL spelling and grammatical mistakes in task titles. Task titles must be flawlessly written in the target language.
@@ -476,6 +490,8 @@ Rules:
 - If user says "har kuni" or "every day" → is_recurring: true
 - Detect language and understand uz/ru/en input
 - If any task is missing a time, return an empty array [] so the bot can ask for the time later.
+- If user mentions a specific day (ertaga, indinga), calculate the exact YYYY-MM-DD for "target_date". Otherwise, set "target_date" to null.
+- If user explicitly requests a custom reminder time (e.g., "5 daqiqa oldin"), set "reminder_offset" to that integer value in minutes (e.g., 5). If they don't mention a reminder offset, default to 10.
 
 Text: {text}"""
 

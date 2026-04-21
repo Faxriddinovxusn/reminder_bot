@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
 import httpx
+from bson import ObjectId
 
 # Robust .env loading
 _dir = Path(__file__).resolve().parent
@@ -194,16 +195,55 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         import re
         clean_ai_response = re.sub(r"```json\s*\{.*?\}\s*```", "", ai_response, flags=re.DOTALL).strip()
         
-        # Intercept propose_tasks from voice
+        # Intercept propose_tasks from voice — SILENT ADD (same as ai_chat)
         if action_result and action_result.get("action") == "propose_tasks":
             extracted_tasks = action_result.get("data") or []
             if extracted_tasks:
-                await set_state(tg_id, "awaiting_confirmation", pending_tasks=extracted_tasks, current_task_index=0)
-                await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
-                if clean_ai_response:
-                    await update.message.reply_text(clean_ai_response)
-                await send_plan_confirmation_message(update.message, extracted_tasks, lang)
-                return
+                from bot.handlers.todo import save_confirmed_plan_tasks
+                saved_ids = await save_confirmed_plan_tasks(tg_id, extracted_tasks)
+                if saved_ids:
+                    task_db = get_db()
+                    for i, sid in enumerate(saved_ids):
+                        offset = extracted_tasks[i].get("reminder_offset", 10) if i < len(extracted_tasks) else 10
+                        try:
+                            offset = int(offset)
+                        except Exception:
+                            offset = 10
+                        await task_db.tasks.update_one(
+                            {"_id": ObjectId(sid)},
+                            {"$set": {"reminder_offset": offset, "reminder_sent": False if offset > 0 else True}}
+                        )
+                    # Build confirmation message
+                    summary_parts = []
+                    for i, t in enumerate(extracted_tasks):
+                        title = t.get("title", "")
+                        time_val = t.get("time", "")
+                        offset = t.get("reminder_offset", 10)
+                        try:
+                            offset = int(offset)
+                        except Exception:
+                            offset = 10
+                        date_str = t.get("target_date", "")
+                        date_info = f" ({date_str})" if date_str else ""
+                        if title:
+                            summary_parts.append(f"• {time_val}{date_info} — {title} (🔔 {offset} min)")
+                    summary_str = "\n".join(summary_parts)
+
+                    db_user_fresh = await get_user_by_telegram_id(tg_id)
+                    u_lang = (db_user_fresh or {}).get("language", "uz")
+                    confirm_msgs = {
+                        "uz": f"✅ Rejaga qo'shildi:\n{summary_str}",
+                        "ru": f"✅ Добавлено в план:\n{summary_str}",
+                        "en": f"✅ Added to plan:\n{summary_str}"
+                    }
+                    reply_text = confirm_msgs.get(u_lang, confirm_msgs["uz"])
+                    if clean_ai_response:
+                        reply_text = clean_ai_response + "\n\n" + reply_text
+
+                    new_history[-1]["content"] = reply_text
+                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
+                    await update.message.reply_text(reply_text)
+                    return
 
         # Intercept unknown_intent from voice
         if action_result and action_result.get("action") == "unknown_intent":

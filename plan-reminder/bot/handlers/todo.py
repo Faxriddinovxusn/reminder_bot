@@ -354,21 +354,27 @@ async def save_confirmed_plan_tasks(telegram_id: int, tasks: list, target_date: 
             priority = task.get("priority", "normal")
             time_str = task.get("time")
             is_recurring = bool(task.get("is_recurring", False))
-            task_id = await create_task(telegram_id, title, priority, time_str, is_recurring, target_date)
+            task_target_date = task.get("target_date") or target_date
+            task_reminder_offset = 0
+            try:
+                task_reminder_offset = int(task.get("reminder_offset", 0) or 0)
+            except (ValueError, TypeError):
+                task_reminder_offset = 0
+            task_id = await create_task(telegram_id, title, priority, time_str, is_recurring, task_target_date)
             await db.tasks.update_one(
                 {"_id": ObjectId(task_id)},
                 {"$set": {
                     "telegram_id": telegram_id,
                     "status": "pending",
-                    "reminder_offset": 0,
-                    "reminder_sent": True,
+                    "reminder_offset": task_reminder_offset,
+                    "reminder_sent": True if task_reminder_offset <= 0 else False,
                     "arrival_sent": False,
                 }},
             )
             if is_recurring:
                 await db.tasks.update_one(
                     {"telegram_id": telegram_id, "title": title, "is_recurring": True},
-                    {"$set": {"reminder_offset": 0, "recur_time": time_str}},
+                    {"$set": {"reminder_offset": task_reminder_offset, "recur_time": time_str}},
                 )
             saved_task_ids.append(task_id)
         return saved_task_ids
@@ -1018,12 +1024,16 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if extracted_tasks:
                 saved_ids = await save_confirmed_plan_tasks(tg_id, extracted_tasks)
                 if saved_ids:
-                    # Apply default 10-min reminder to all saved tasks
                     task_db = get_db()
-                    for sid in saved_ids:
+                    for i, sid in enumerate(saved_ids):
+                        offset = extracted_tasks[i].get("reminder_offset", 10) if i < len(extracted_tasks) else 10
+                        try:
+                            offset = int(offset)
+                        except:
+                            offset = 10
                         await task_db.tasks.update_one(
                             {"_id": ObjectId(sid)},
-                            {"$set": {"reminder_offset": 10, "reminder_sent": False}}
+                            {"$set": {"reminder_offset": offset, "reminder_sent": False if offset > 0 else True}}
                         )
                     # Build short confirmation message
                     task_names = [t.get("title", "") for t in extracted_tasks if t.get("title")]
@@ -1031,12 +1041,19 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     summary_parts = []
                     for i, name in enumerate(task_names):
                         t = task_times[i] if i < len(task_times) else ""
-                        summary_parts.append(f"• {t} — {name}" if t else f"• {name}")
+                        offset = extracted_tasks[i].get("reminder_offset", 10) if i < len(extracted_tasks) else 10
+                        try:
+                            offset = int(offset)
+                        except:
+                            offset = 10
+                        date_str = extracted_tasks[i].get("target_date") if i < len(extracted_tasks) else ""
+                        date_info = f" ({date_str})" if date_str else ""
+                        summary_parts.append(f"• {t}{date_info} — {name} (🔔 {offset} min)")
                     summary_str = "\n".join(summary_parts)
                     confirm_msgs = {
-                        "uz": f"✅ Rejaga qo'shildi (10 daqiqa oldin eslataman):\n{summary_str}",
-                        "ru": f"✅ Добавлено в план (напомню за 10 мин):\n{summary_str}",
-                        "en": f"✅ Added to plan (will remind 10 min before):\n{summary_str}"
+                        "uz": f"✅ Rejaga qo'shildi:\n{summary_str}",
+                        "ru": f"✅ Добавлено в план:\n{summary_str}",
+                        "en": f"✅ Added to plan:\n{summary_str}"
                     }
                     reply_text = confirm_msgs.get(lang, confirm_msgs["uz"])
                     if clean_ai_response:
