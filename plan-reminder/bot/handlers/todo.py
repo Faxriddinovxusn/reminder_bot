@@ -1022,15 +1022,29 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not is_admin_user and action_result and action_result.get("action") == "propose_tasks":
             extracted_tasks = action_result.get("data") or []
             if extracted_tasks:
+                tasks_without_time = [t for t in extracted_tasks if not t.get("time")]
+                if tasks_without_time:
+                    title = tasks_without_time[0].get("title", "vazifa")
+                    ask_msg = {
+                        "uz": f"Siz \"{title}\" haqida aytdingiz, lekin soatini aniq aytmadingiz. Qachon bajarmoqchisiz?",
+                        "ru": f"Вы упомянули \"{title}\", но не назвали точное время. Когда вы планируете это сделать?",
+                        "en": f"You mentioned \"{title}\", but didn't specify the time. When do you want to do it?"
+                    }
+                    reply_text = ask_msg.get(lang, ask_msg["uz"])
+                    history[-1]["content"] = reply_text
+                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-10:]}})
+                    await update.message.reply_text(reply_text)
+                    return
+
                 saved_ids = await save_confirmed_plan_tasks(tg_id, extracted_tasks)
                 if saved_ids:
                     task_db = get_db()
                     for i, sid in enumerate(saved_ids):
-                        offset = extracted_tasks[i].get("reminder_offset", 10) if i < len(extracted_tasks) else 10
+                        offset = extracted_tasks[i].get("reminder_offset", 0) if i < len(extracted_tasks) else 0
                         try:
                             offset = int(offset)
                         except:
-                            offset = 10
+                            offset = 0
                         await task_db.tasks.update_one(
                             {"_id": ObjectId(sid)},
                             {"$set": {"reminder_offset": offset, "reminder_sent": False if offset > 0 else True}}
@@ -1041,14 +1055,17 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     summary_parts = []
                     for i, name in enumerate(task_names):
                         t = task_times[i] if i < len(task_times) else ""
-                        offset = extracted_tasks[i].get("reminder_offset", 10) if i < len(extracted_tasks) else 10
+                        offset = extracted_tasks[i].get("reminder_offset", 0) if i < len(extracted_tasks) else 0
                         try:
                             offset = int(offset)
                         except:
-                            offset = 10
+                            offset = 0
                         date_str = extracted_tasks[i].get("target_date") if i < len(extracted_tasks) else ""
                         date_info = f" ({date_str})" if date_str else ""
-                        summary_parts.append(f"• {t}{date_info} — {name} (🔔 {offset} min)")
+                        if offset > 0:
+                            summary_parts.append(f"• {t}{date_info} — {name} (🔔 {offset} min oldin)")
+                        else:
+                            summary_parts.append(f"• {t}{date_info} — {name} (🔔 vaqtida)")
                     summary_str = "\n".join(summary_parts)
                     confirm_msgs = {
                         "uz": f"✅ Rejaga qo'shildi:\n{summary_str}",

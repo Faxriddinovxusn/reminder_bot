@@ -199,16 +199,30 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if action_result and action_result.get("action") == "propose_tasks":
             extracted_tasks = action_result.get("data") or []
             if extracted_tasks:
+                tasks_without_time = [t for t in extracted_tasks if not t.get("time")]
+                if tasks_without_time:
+                    title = tasks_without_time[0].get("title", "vazifa")
+                    ask_msg = {
+                        "uz": f"Siz \"{title}\" haqida aytdingiz, lekin soatini aniq aytmadingiz. Qachon bajarmoqchisiz?",
+                        "ru": f"Вы упомянули \"{title}\", но не назвали точное время. Когда вы планируете это сделать?",
+                        "en": f"You mentioned \"{title}\", but didn't specify the time. When do you want to do it?"
+                    }
+                    reply_text = ask_msg.get(lang, ask_msg["uz"])
+                    new_history[-1]["content"] = reply_text
+                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
+                    await update.message.reply_text(reply_text)
+                    return
+
                 from bot.handlers.todo import save_confirmed_plan_tasks
                 saved_ids = await save_confirmed_plan_tasks(tg_id, extracted_tasks)
                 if saved_ids:
                     task_db = get_db()
                     for i, sid in enumerate(saved_ids):
-                        offset = extracted_tasks[i].get("reminder_offset", 10) if i < len(extracted_tasks) else 10
+                        offset = extracted_tasks[i].get("reminder_offset", 0) if i < len(extracted_tasks) else 0
                         try:
                             offset = int(offset)
                         except Exception:
-                            offset = 10
+                            offset = 0
                         await task_db.tasks.update_one(
                             {"_id": ObjectId(sid)},
                             {"$set": {"reminder_offset": offset, "reminder_sent": False if offset > 0 else True}}
@@ -218,15 +232,18 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                     for i, t in enumerate(extracted_tasks):
                         title = t.get("title", "")
                         time_val = t.get("time", "")
-                        offset = t.get("reminder_offset", 10)
+                        offset = t.get("reminder_offset", 0)
                         try:
                             offset = int(offset)
                         except Exception:
-                            offset = 10
+                            offset = 0
                         date_str = t.get("target_date", "")
                         date_info = f" ({date_str})" if date_str else ""
                         if title:
-                            summary_parts.append(f"• {time_val}{date_info} — {title} (🔔 {offset} min)")
+                            if offset > 0:
+                                summary_parts.append(f"• {time_val}{date_info} — {title} (🔔 {offset} min oldin)")
+                            else:
+                                summary_parts.append(f"• {time_val}{date_info} — {title} (🔔 vaqtida)")
                     summary_str = "\n".join(summary_parts)
 
                     db_user_fresh = await get_user_by_telegram_id(tg_id)
