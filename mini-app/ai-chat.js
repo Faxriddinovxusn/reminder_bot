@@ -11,7 +11,7 @@ function detectLanguage() {
 let aiChatState = {
     isOpen: false,
     isListening: false,
-    messageHistory: [], // Last 6 messages
+    messageHistory: [], // Last 12 pairs (24 messages)
     language: detectLanguage(),
     pendingTasks: null,
     planState: 'idle'
@@ -166,8 +166,8 @@ async function sendAiMessage() {
     
     // Add to history
     aiChatState.messageHistory.push({ role: 'user', content: message });
-    if (aiChatState.messageHistory.length > 12) {
-        aiChatState.messageHistory.shift(); // Keep last 6 pairs (12 messages)
+    if (aiChatState.messageHistory.length > 24) {
+        aiChatState.messageHistory.shift(); // Keep last 12 pairs (24 messages)
     }
     
     try {
@@ -203,7 +203,7 @@ async function sendAiMessage() {
             body: JSON.stringify({
                 userId,
                 message: apiMessage,
-                history: aiChatState.messageHistory.slice(-10), // Send last 5 pairs
+                history: aiChatState.messageHistory.slice(-20), // Send last 10 pairs
                 language: aiChatState.language || 'en',
             }),
         });
@@ -236,7 +236,7 @@ async function sendAiMessage() {
         
         // Add to history
         aiChatState.messageHistory.push({ role: 'assistant', content: aiResponse });
-        if (aiChatState.messageHistory.length > 12) aiChatState.messageHistory.shift();
+        if (aiChatState.messageHistory.length > 24) aiChatState.messageHistory.shift();
         
         // Show task suggestions if tasks were extracted (legacy fallback)
         const extractedTasks = data.tasks || [];

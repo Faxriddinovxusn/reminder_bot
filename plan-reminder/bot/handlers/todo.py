@@ -1026,13 +1026,13 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 if tasks_without_time:
                     title = tasks_without_time[0].get("title", "vazifa")
                     ask_msg = {
-                        "uz": f"Siz \"{title}\" haqida aytdingiz, lekin soatini aniq aytmadingiz. Qachon bajarmoqchisiz?",
-                        "ru": f"Вы упомянули \"{title}\", но не назвали точное время. Когда вы планируете это сделать?",
-                        "en": f"You mentioned \"{title}\", but didn't specify the time. When do you want to do it?"
+                        "uz": f"🕐 \"{title}\" — soat nechada?",
+                        "ru": f"🕐 \"{title}\" — во сколько?",
+                        "en": f"🕐 \"{title}\" — what time?"
                     }
                     reply_text = ask_msg.get(lang, ask_msg["uz"])
                     history[-1]["content"] = reply_text
-                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-10:]}})
+                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-20:]}})
                     await update.message.reply_text(reply_text)
                     return
 
@@ -1077,7 +1077,7 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         reply_text = clean_ai_response + "\n\n" + reply_text
                     
                     history[-1]["content"] = reply_text
-                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-10:]}})
+                    await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-20:]}})
                     await update.message.reply_text(reply_text)
                     return
 
@@ -1090,7 +1090,7 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             }
             reply_text = fallback_text.get(lang, fallback_text["uz"])
             history[-1]["content"] = reply_text
-            await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-10:]}})
+            await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-20:]}})
             await update.message.reply_text(reply_text)
             return
 
@@ -1104,7 +1104,7 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             clean_ai_response += reminder_text.get(lang, reminder_text["uz"])
             history[-1]["content"] = clean_ai_response
 
-        await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-10:]}})
+        await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": history[-20:]}})
         await update.message.reply_text(clean_ai_response)
     except Exception as e:
         logging.exception("ai_chat error: %s", e)

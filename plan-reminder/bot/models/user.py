@@ -24,7 +24,7 @@ async def log_command_to_history(telegram_id: int, command: str, bot_reply: str)
     history.append({"role": "assistant", "content": bot_reply})
     await db[USERS_COLL].update_one(
         {"telegram_id": telegram_id}, 
-        {"$set": {"chat_history": history[-10:]}}
+        {"$set": {"chat_history": history[-20:]}}
     )
 
 

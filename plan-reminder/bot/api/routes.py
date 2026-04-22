@@ -678,7 +678,7 @@ async def ai_chat(request: Request, auth_user_id: str = Depends(verify_telegram_
         # Call AI with automatic key rotation (handled by call_groq in ai.py)
         from bot.services.ai import get_ai_response
         try:
-            ai_result = await get_ai_response(message, language, history[-10:], user_profile)
+            ai_result = await get_ai_response(message, language, history[-20:], user_profile)
             if isinstance(ai_result, tuple):
                 ai_response, _ = ai_result
             else:
@@ -724,7 +724,7 @@ async def ai_chat(request: Request, auth_user_id: str = Depends(verify_telegram_
             chat_history = history if history is not None else []
             chat_history.append({"role": "user", "content": message})
             chat_history.append({"role": "assistant", "content": clean_ai_response})
-            await db.users.update_one({"_id": user["_id"]}, {"$set": {"chat_history": chat_history[-15:]}})
+            await db.users.update_one({"_id": user["_id"]}, {"$set": {"chat_history": chat_history[-20:]}})
             history = chat_history[-6:] # Update history for action detection
         
         return {

@@ -183,7 +183,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         # Update history with new messages
         history.append({"role": "user", "content": transcribed_text})
         history.append({"role": "assistant", "content": ai_response})
-        new_history = history[-15:]
+        new_history = history[-20:]
         from bot.services.db import get_db
         await get_db().users.update_one({"telegram_id": tg_id}, {"$set": {"chat_history": new_history}})
         
@@ -203,9 +203,9 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 if tasks_without_time:
                     title = tasks_without_time[0].get("title", "vazifa")
                     ask_msg = {
-                        "uz": f"Siz \"{title}\" haqida aytdingiz, lekin soatini aniq aytmadingiz. Qachon bajarmoqchisiz?",
-                        "ru": f"Вы упомянули \"{title}\", но не назвали точное время. Когда вы планируете это сделать?",
-                        "en": f"You mentioned \"{title}\", but didn't specify the time. When do you want to do it?"
+                        "uz": f"🕒 \"{title}\" — soat nechada?",
+                        "ru": f"🕒 \"{title}\" — во сколько?",
+                        "en": f"🕒 \"{title}\" — what time?"
                     }
                     reply_text = ask_msg.get(lang, ask_msg["uz"])
                     new_history[-1]["content"] = reply_text
