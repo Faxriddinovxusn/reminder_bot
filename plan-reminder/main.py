@@ -570,6 +570,12 @@ async def master_message_handler(update: Update, context: ContextTypes.DEFAULT_T
             from bot.handlers.admin import handle_broadcast_message
             await handle_broadcast_message(update, context)
             return
+            
+        if state_doc.get("state") == "awaiting_custom_timezone":
+            from bot.handlers.start import handle_custom_timezone
+            consumed = await handle_custom_timezone(update, context)
+            if consumed:
+                return
 
         # Route to original handlers based on content
         if update.message.photo:

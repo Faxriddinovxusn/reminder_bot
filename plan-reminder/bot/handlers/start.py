@@ -152,13 +152,17 @@ async def timezone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         }
         await query.edit_message_text(confirm_texts.get(lang, confirm_texts["uz"]))
 
-        # Send welcome message as a new message
+        from datetime import datetime, timedelta, timezone
+        user_tz = timezone(timedelta(hours=tz_info['offset']))
+        local_time = datetime.now(user_tz).strftime("%H:%M")
+
+        # Send welcome message showing current time
         voice_messages = {
-            "uz": "Assalomu aleykum!\n🎤 Ovozli xabarlar orqali ham muloqot qilishimiz mumkin, faqat aniq gapirsangiz bas.\n\n📅 Reja tuzish uchun: /plan\n📊 Statistika va jarayonlar uchun: /web\n📱 Mini ilovaga kirish uchun: /app\n🌐 Tilni o'zgartirish uchun: /language",
-            "ru": "Здравствуйте!\n🎤 Мы можем общаться голосовыми сообщениями, просто говорите чётко.\n\n📅 Создать план: /plan\n📊 Статистика и процессы: /web\n📱 Открыть мини-приложение: /app\n🌐 Изменить язык: /language",
-            "en": "Hello!\n🎤 We can also communicate via voice messages, just speak clearly.\n\n📅 To create a plan: /plan\n📊 For statistics and progress: /web\n📱 To open the mini-app: /app\n🌐 To change language: /language"
+            "uz": f"Hozir {tz_info['country']}da soat {local_time} bo'ldi, qanday rejangiz bor?",
+            "ru": f"Сейчас в {tz_info['country']} {local_time}, какие у вас планы?",
+            "en": f"It is now {local_time} in {tz_info['country']}, what are your plans?"
         }
-        voice_text = voice_messages.get(lang, voice_messages["en"])
+        voice_text = voice_messages.get(lang, voice_messages["uz"])
         await query.message.reply_text(voice_text)
 
     except Exception as e:
@@ -233,6 +237,10 @@ If the country name is misspelled, fix it. If truly unrecognizable, return:
                 await set_timezone(tg_id, country, tz_str, offset)
                 await clear_state(tg_id)
 
+                from datetime import datetime, timedelta, timezone
+                user_tz = timezone(timedelta(hours=offset))
+                local_time = datetime.now(user_tz).strftime("%H:%M")
+
                 confirm_texts = {
                     "uz": f"✅ {country} ({tz_str}) tanlandi!",
                     "ru": f"✅ {country} ({tz_str}) выбрано!",
@@ -240,13 +248,13 @@ If the country name is misspelled, fix it. If truly unrecognizable, return:
                 }
                 await wait_msg.edit_text(confirm_texts.get(lang, confirm_texts["uz"]))
 
-                # Send welcome message
+                # Send welcome message showing current time
                 voice_messages = {
-                    "uz": "Assalomu aleykum!\n🎤 Ovozli xabarlar orqali ham muloqot qilishimiz mumkin, faqat aniq gapirsangiz bas.\n\n📅 Reja tuzish uchun: /plan\n📊 Statistika va jarayonlar uchun: /web\n📱 Mini ilovaga kirish uchun: /app\n🌐 Tilni o'zgartirish uchun: /language",
-                    "ru": "Здравствуйте!\n🎤 Мы можем общаться голосовыми сообщениями, просто говорите чётко.\n\n📅 Создать план: /plan\n📊 Статистика и процессы: /web\n📱 Открыть мини-приложение: /app\n🌐 Изменить язык: /language",
-                    "en": "Hello!\n🎤 We can also communicate via voice messages, just speak clearly.\n\n📅 To create a plan: /plan\n📊 For statistics and progress: /web\n📱 To open the mini-app: /app\n🌐 To change language: /language"
+                    "uz": f"Hozir {country}da soat {local_time} bo'ldi, qanday rejangiz bor?",
+                    "ru": f"Сейчас в {country} {local_time}, какие у вас планы?",
+                    "en": f"It is now {local_time} in {country}, what are your plans?"
                 }
-                voice_text = voice_messages.get(lang, voice_messages["en"])
+                voice_text = voice_messages.get(lang, voice_messages["uz"])
                 await update.message.reply_text(voice_text)
                 return True
             else:
