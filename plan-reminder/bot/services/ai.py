@@ -125,7 +125,7 @@ async def call_groq(
 
 SYSTEM_PROMPT = """You are PlanAI — a smart, warm personal productivity assistant.
 
-CURRENT TIME: {current_time}, DATE: {current_date} (Tashkent UTC+5)
+CURRENT TIME: {current_time}, DATE: {current_date} ({tz_label})
 USER LANGUAGE: {language}
 
 ═══ RULE 1: LANGUAGE ═══
@@ -215,12 +215,14 @@ async def get_ai_response(
     language: str,
     history: List[Dict[str, str]],
     user_profile: Optional[Dict[str, Any]] = None,
+    timezone_offset: int = 5,
 ) -> Union[str, Tuple[str, Dict[str, Any]]]:
     try:
-        tashkent = timezone(timedelta(hours=5))
-        now = datetime.now(tashkent)
+        user_tz = timezone(timedelta(hours=timezone_offset))
+        now = datetime.now(user_tz)
         current_time = now.strftime("%H:%M")
         current_date = now.strftime("%d.%m.%Y, %A")
+        tz_label = f"UTC+{timezone_offset}" if timezone_offset >= 0 else f"UTC{timezone_offset}"
         profile_data = user_profile or {}
         current_interaction_count = int(profile_data.get("interaction_count", 0) or 0)
 
@@ -240,6 +242,7 @@ async def get_ai_response(
                 language=language, 
                 current_time=current_time, 
                 current_date=current_date, 
+                tz_label=tz_label,
             )
             + admin_context
             + f"\nUSER: {profile_data.get('username', 'User')} | Style: {style} | {habit_str}"
@@ -300,7 +303,7 @@ Return only the JSON array."""
         logging.exception("extract_tasks_from_schedule error: %s", e)
         return "[]"
 
-async def extract_tasks_from_text(text: str, language: str, user_habits: list = None, plan_type: str = "daily") -> List[Dict[str, Any]]:
+async def extract_tasks_from_text(text: str, language: str, user_habits: list = None, plan_type: str = "daily", timezone_offset: int = 5) -> List[Dict[str, Any]]:
     if user_habits is None:
         user_habits = []
     try:
@@ -315,13 +318,15 @@ async def extract_tasks_from_text(text: str, language: str, user_habits: list = 
         }
         period_hint = period_instructions.get(plan_type, "")
 
-        tashkent_now = datetime.now(timezone(timedelta(hours=5)))
-        current_time_str = tashkent_now.strftime("%H:%M")
-        today_iso = tashkent_now.date().isoformat()
-        tomorrow_iso = (tashkent_now.date() + timedelta(days=1)).isoformat()
+        user_tz = timezone(timedelta(hours=timezone_offset))
+        user_now = datetime.now(user_tz)
+        current_time_str = user_now.strftime("%H:%M")
+        today_iso = user_now.date().isoformat()
+        tomorrow_iso = (user_now.date() + timedelta(days=1)).isoformat()
+        tz_label = f"UTC+{timezone_offset}" if timezone_offset >= 0 else f"UTC{timezone_offset}"
 
         prompt = f"""STRICT TASK DETECTION ({plan_type.upper()} PLAN):
-CURRENT DATE INFO: Today is {today_iso}, Tomorrow is {tomorrow_iso}. Timezone: Tashkent UTC+5.
+CURRENT DATE INFO: Today is {today_iso}, Tomorrow is {tomorrow_iso}. Timezone: {tz_label}.
 CURRENT EXACT TIME: {current_time_str}
 Before extracting tasks, check if the message is valid for task extraction.
 Extract tasks ONLY if the message contains BOTH:
@@ -380,10 +385,11 @@ Text: {text}"""
         logging.exception("extract_tasks_from_text error: %s", e)
         return []
 
-async def extract_monthly_dates_and_tasks(text: str, language: str) -> Dict[str, List[Dict[str, Any]]]:
+async def extract_monthly_dates_and_tasks(text: str, language: str, timezone_offset: int = 5) -> Dict[str, List[Dict[str, Any]]]:
     try:
-        tashkent_now = datetime.now(timezone(timedelta(hours=5)))
-        today_date_str = tashkent_now.date().isoformat()
+        user_tz = timezone(timedelta(hours=timezone_offset))
+        user_now = datetime.now(user_tz)
+        today_date_str = user_now.date().isoformat()
         
         prompt = f"""STRICT MONTHLY CALENDAR EXTRACTION:
 The user is providing a list of important dates and tasks for their monthly plan.

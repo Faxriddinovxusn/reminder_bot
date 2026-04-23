@@ -265,9 +265,11 @@ async def get_tasks(user_id: str, auth_user_id: str = Depends(verify_telegram_au
     if not user:
         return {"data": []}
     
-    # Use Tashkent timezone for "today" to match how tasks are stored
-    now_tashkent = datetime.now(TASHKENT_TZ)
-    today = now_tashkent.date()
+    # Use user's timezone for "today" to match how tasks are stored
+    tz_offset = int(user.get("timezone_offset", 5) or 5)
+    user_tz = timezone(timedelta(hours=tz_offset))
+    now_user = datetime.now(user_tz)
+    today = now_user.date()
     today_str = today.isoformat()
     
     # Get tasks for today (support tasks saved by bot via telegram_id as well)
@@ -320,8 +322,9 @@ async def get_future_tasks(user_id: str, auth_user_id: str = Depends(verify_tele
     if not user:
         return {"data": []}
 
-    now_tashkent = datetime.now(TASHKENT_TZ)
-    today_str = now_tashkent.date().isoformat()
+    tz_offset = int(user.get("timezone_offset", 5) or 5)
+    user_tz = timezone(timedelta(hours=tz_offset))
+    today_str = datetime.now(user_tz).date().isoformat()
 
     or_conditions = [
         {"user_id": user["_id"], "date": {"$gt": today_str}},
@@ -660,8 +663,11 @@ async def ai_chat(request: Request, auth_user_id: str = Depends(verify_telegram_
         
         today_tasks = []
         user_profile = {}
+        tz_offset = 5
         if user:
-            today = datetime.now(TASHKENT_TZ).date().isoformat()
+            tz_offset = int(user.get("timezone_offset", 5) or 5)
+            user_tz = timezone(timedelta(hours=tz_offset))
+            today = datetime.now(user_tz).date().isoformat()
             tasks = await db.tasks.find({"date": today, "$or": [{"telegram_id": user_id}, {"telegram_id": int(user_id) if user_id.isdigit() else user_id}, {"user_id": user["_id"]}]}).to_list(20)
             today_tasks = [{"title": t.get("title",""), "time": t.get("time", ""), "is_done": t.get("is_done",False), "id": str(t["_id"])} for t in tasks]
             user_profile = {
@@ -678,7 +684,7 @@ async def ai_chat(request: Request, auth_user_id: str = Depends(verify_telegram_
         # Call AI with automatic key rotation (handled by call_groq in ai.py)
         from bot.services.ai import get_ai_response
         try:
-            ai_result = await get_ai_response(message, language, history[-20:], user_profile)
+            ai_result = await get_ai_response(message, language, history[-20:], user_profile, timezone_offset=tz_offset)
             if isinstance(ai_result, tuple):
                 ai_response, _ = ai_result
             else:
@@ -761,8 +767,9 @@ async def get_archive(user_id: str, auth_user_id: str = Depends(verify_telegram_
     if not user:
         return {"data": []}
     
-    now_tashkent = datetime.now(TASHKENT_TZ)
-    today_str = now_tashkent.date().isoformat()
+    tz_offset = int(user.get("timezone_offset", 5) or 5)
+    user_tz = timezone(timedelta(hours=tz_offset))
+    today_str = datetime.now(user_tz).date().isoformat()
     
     # Get all tasks from past days
     past_tasks = await db.tasks.find({
@@ -1152,6 +1159,48 @@ async def admin_system(is_admin: bool = Depends(verify_admin_auth)):
         "uptime": True,
         "errorLogs": error_logs,
     }
+
+
+@app.get("/api/admin/geography")
+async def admin_geography(is_admin: bool = Depends(verify_admin_auth)):
+    """User geography analytics"""
+    try:
+        pipeline = [
+            {"$group": {"_id": "$country", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}}
+        ]
+        results = await db.users.aggregate(pipeline).to_list(100)
+        
+        total_users = await db.users.count_documents({})
+        if total_users == 0:
+            return []
+            
+        country_flags = {
+            "O'zbekiston": "🇺🇿",
+            "Rossiya": "🇷🇺",
+            "Turkiya": "🇹🇷",
+            "Qozog'iston": "🇰🇿",
+            "Amerika": "🇺🇸"
+        }
+        
+        geography_data = []
+        for r in results:
+            country_name = r["_id"] if r["_id"] else "Boshqa"
+            flag = country_flags.get(country_name, "🌍")
+            count = r["count"]
+            percentage = round((count / total_users) * 100)
+            
+            geography_data.append({
+                "country": country_name,
+                "flag": flag,
+                "count": count,
+                "percentage": percentage
+            })
+            
+        return geography_data
+    except Exception as e:
+        logging.exception("admin_geography error: %s", e)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== ADMIN AI CHAT ====================

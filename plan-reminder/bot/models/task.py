@@ -6,7 +6,6 @@ from bson import ObjectId
 from bot.services.db import get_db
 
 TASKS_COLL = "tasks"
-TASHKENT_TZ = timezone(timedelta(hours=5))
 
 async def _resolve_user_refs(telegram_id: int) -> Dict[str, Any]:
     try:
@@ -37,21 +36,21 @@ def _normalize_time_value(time_value: Optional[Any]) -> Optional[str]:
     except Exception:
         return None
 
-def _tashkent_today() -> date:
+def _user_today(user_tz: timezone) -> date:
     try:
-        return datetime.now(TASHKENT_TZ).date()
+        return datetime.now(user_tz).date()
     except Exception:
         return datetime.utcnow().date()
 
-def _build_scheduled_time_utc(target_date: date, time_text: Optional[str]) -> Optional[datetime]:
+def _build_scheduled_time_utc(target_date: date, time_text: Optional[str], user_tz: timezone) -> Optional[datetime]:
     try:
         if not time_text:
             return None
         local_time = datetime.strptime(time_text, "%H:%M").time()
-        local_dt = datetime.combine(target_date, local_time).replace(tzinfo=TASHKENT_TZ)
+        local_dt = datetime.combine(target_date, local_time).replace(tzinfo=user_tz)
         
         # If time is in the past, move to tomorrow
-        now_local = datetime.now(TASHKENT_TZ)
+        now_local = datetime.now(user_tz)
         if local_dt < now_local:
             local_dt += timedelta(days=1)
             
@@ -78,8 +77,12 @@ async def create_task(
 ) -> str:
     try:
         user_refs = await _resolve_user_refs(telegram_id)
+        user_doc = user_refs.get("user") or {}
+        user_offset = int(user_doc.get("timezone_offset", 5) or 5)
+        user_tz = timezone(timedelta(hours=user_offset))
+        
         now_utc = datetime.utcnow()
-        today_local = _tashkent_today()
+        today_local = _user_today(user_tz)
         time_text = _normalize_time_value(time)
         reminder_offset = 10
 
@@ -91,7 +94,7 @@ async def create_task(
             "priority": priority or "normal",
             "date": target_date if target_date else today_local.isoformat(),
             "time": time_text,
-            "scheduled_time": _build_scheduled_time_utc(date.fromisoformat(target_date) if target_date else today_local, time_text),
+            "scheduled_time": _build_scheduled_time_utc(date.fromisoformat(target_date) if target_date else today_local, time_text, user_tz),
             "is_recurring": False,
             "recur_time": None,
             "reminder_offset": reminder_offset,
@@ -133,7 +136,10 @@ async def get_tasks_for_user_on_date(telegram_id: int, date_: Optional[date] = N
         db = get_db()
         user_refs = await _resolve_user_refs(telegram_id)
         if date_ is None:
-            date_ = _tashkent_today()
+            user_doc = user_refs.get("user") or {}
+            user_offset = int(user_doc.get("timezone_offset", 5) or 5)
+            user_tz = timezone(timedelta(hours=user_offset))
+            date_ = _user_today(user_tz)
         query = {
             "date": date_.isoformat(),
             "$or": [
@@ -165,12 +171,16 @@ async def mark_task_done(task_id) -> None:
 async def create_scheduled_task(user_id: int, title: str, scheduled_time: datetime, reminder_offset: int = 10) -> str:
     try:
         user_refs = await _resolve_user_refs(user_id)
+        user_doc = user_refs.get("user") or {}
+        user_offset = int(user_doc.get("timezone_offset", 5) or 5)
+        user_tz = timezone(timedelta(hours=user_offset))
+        
         now_utc = datetime.utcnow()
         if scheduled_time.tzinfo is not None:
             scheduled_time_utc = scheduled_time.astimezone(timezone.utc).replace(tzinfo=None)
-            local_date = scheduled_time.astimezone(TASHKENT_TZ).date()
+            local_date = scheduled_time.astimezone(user_tz).date()
         else:
-            local_dt = scheduled_time.replace(tzinfo=TASHKENT_TZ)
+            local_dt = scheduled_time.replace(tzinfo=user_tz)
             scheduled_time_utc = local_dt.astimezone(timezone.utc).replace(tzinfo=None)
             local_date = local_dt.date()
         task_doc = {
@@ -180,7 +190,7 @@ async def create_scheduled_task(user_id: int, title: str, scheduled_time: dateti
             "is_done": False,
             "priority": "normal",
             "date": local_date.isoformat(),
-            "time": local_dt.strftime("%H:%M") if scheduled_time.tzinfo is None else scheduled_time.astimezone(TASHKENT_TZ).strftime("%H:%M"),
+            "time": local_dt.strftime("%H:%M") if scheduled_time.tzinfo is None else scheduled_time.astimezone(user_tz).strftime("%H:%M"),
             "scheduled_time": scheduled_time_utc,
             "is_recurring": False,
             "recur_time": None,

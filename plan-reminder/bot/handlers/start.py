@@ -2,9 +2,20 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import ContextTypes
 import logging
 
-from bot.models.user import create_user, get_user_by_telegram_id, set_language
+from bot.models.user import create_user, get_user_by_telegram_id, set_language, set_timezone
+from bot.models.state import set_state, get_state, clear_state
 from bot.messages import messages
 from bot.config import MINI_APP_URL
+
+# ═══ TIMEZONE MAP ═══
+TIMEZONE_MAP = {
+    "tz_uz": {"country": "O'zbekiston", "timezone": "UTC+5", "offset": 5},
+    "tz_ru": {"country": "Rossiya", "timezone": "UTC+3", "offset": 3},
+    "tz_tr": {"country": "Turkiya", "timezone": "UTC+3", "offset": 3},
+    "tz_kz": {"country": "Qozog'iston", "timezone": "UTC+5", "offset": 5},
+    "tz_us": {"country": "Amerika", "timezone": "UTC-5", "offset": -5},
+}
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
@@ -37,6 +48,42 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception:
             pass
 
+
+async def _show_timezone_buttons(message_or_query, lang: str, edit: bool = True) -> None:
+    """Show timezone country selection buttons."""
+    tz_texts = {
+        "uz": "🌍 Qaysi davlatdasiz?",
+        "ru": "🌍 В какой вы стране?",
+        "en": "🌍 What country are you in?",
+    }
+    keyboard = [
+        [InlineKeyboardButton("🇺🇿 O'zbekiston (UTC+5)", callback_data="tz_uz")],
+        [InlineKeyboardButton("🇷🇺 Rossiya (UTC+3)", callback_data="tz_ru")],
+        [InlineKeyboardButton("🇹🇷 Turkiya (UTC+3)", callback_data="tz_tr")],
+        [InlineKeyboardButton("🇰🇿 Qozog'iston (UTC+5)", callback_data="tz_kz")],
+        [InlineKeyboardButton("🇺🇸 Amerika (UTC-5)", callback_data="tz_us")],
+        [InlineKeyboardButton("🌍 Boshqa", callback_data="tz_other")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = tz_texts.get(lang, tz_texts["uz"])
+
+    if edit:
+        await message_or_query.edit_message_text(text, reply_markup=reply_markup)
+    else:
+        await message_or_query.reply_text(text, reply_markup=reply_markup)
+
+
+async def _send_welcome_message(query, lang: str) -> None:
+    """Send the final welcome/instruction message after onboarding is complete."""
+    voice_messages = {
+        "uz": "Assalomu aleykum!\n🎤 Ovozli xabarlar orqali ham muloqot qilishimiz mumkin, faqat aniq gapirsangiz bas.\n\n📅 Reja tuzish uchun: /plan\n📊 Statistika va jarayonlar uchun: /web\n📱 Mini ilovaga kirish uchun: /app\n🌐 Tilni o'zgartirish uchun: /language",
+        "ru": "Здравствуйте!\n🎤 Мы можем общаться голосовыми сообщениями, просто говорите чётко.\n\n📅 Создать план: /plan\n📊 Статистика и процессы: /web\n📱 Открыть мини-приложение: /app\n🌐 Изменить язык: /language",
+        "en": "Hello!\n🎤 We can also communicate via voice messages, just speak clearly.\n\n📅 To create a plan: /plan\n📊 For statistics and progress: /web\n📱 To open the mini-app: /app\n🌐 To change language: /language"
+    }
+    voice_text = voice_messages.get(lang, voice_messages["en"])
+    await query.edit_message_text(voice_text)
+
+
 async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         query = update.callback_query
@@ -47,21 +94,14 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         parts = data.split("_")
         lang = parts[1] if len(parts) > 1 else "uz"
         user = query.from_user
-        user_id = user.id if user else "N/A"
         if user:
             await set_language(user.id, lang)
+            # Store selected language in user_data for timezone flow
+            if context.user_data is not None:
+                context.user_data['selected_lang'] = lang
             
-        is_new = context.user_data.get('is_new', False) if context.user_data is not None else False
-        
-        # Voice instruction message
-        voice_messages = {
-            "uz": "Assalomu aleykum!\n🎤 Ovozli xabarlar orqali ham muloqot qilishimiz mumkin, faqat aniq gapirsangiz bas.\n\n📅 Reja tuzish uchun: /plan\n📊 Statistika va jarayonlar uchun: /web\n📱 Mini ilovaga kirish uchun: /app\n🌐 Tilni o'zgartirish uchun: /language",
-            "ru": "Здравствуйте!\n🎤 Мы можем общаться голосовыми сообщениями, просто говорите чётко.\n\n📅 Создать план: /plan\n📊 Статистика и процессы: /web\n📱 Открыть мини-приложение: /app\n🌐 Изменить язык: /language",
-            "en": "Hello!\n🎤 We can also communicate via voice messages, just speak clearly.\n\n📅 To create a plan: /plan\n📊 For statistics and progress: /web\n📱 To open the mini-app: /app\n🌐 To change language: /language"
-        }
-        
-        voice_text = voice_messages.get(lang, voice_messages["en"])
-        await query.edit_message_text(voice_text)
+        # After language selection → show timezone buttons
+        await _show_timezone_buttons(query, lang, edit=True)
         
     except Exception as e:
         logging.exception("language callback error: %s", e)
@@ -70,6 +110,173 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 await update.callback_query.message.reply_text("An error occurred.")
         except Exception:
             pass
+
+
+async def timezone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle timezone country selection buttons (tz_uz, tz_ru, etc.)"""
+    try:
+        query = update.callback_query
+        if query is None or query.from_user is None:
+            return
+        await query.answer()
+        data = query.data or ""
+        tg_id = query.from_user.id
+
+        # Get user's language
+        db_user = await get_user_by_telegram_id(tg_id)
+        lang = db_user.get("language", "uz") if db_user else "uz"
+
+        if data == "tz_other":
+            # Ask user to type their country name
+            ask_texts = {
+                "uz": "🌍 Davlatingiz nomini yozing:",
+                "ru": "🌍 Напишите название вашей страны:",
+                "en": "🌍 Type your country name:",
+            }
+            await query.edit_message_text(ask_texts.get(lang, ask_texts["uz"]))
+            await set_state(tg_id, "awaiting_custom_timezone")
+            return
+
+        # Known country selected
+        tz_info = TIMEZONE_MAP.get(data)
+        if not tz_info:
+            return
+        
+        await set_timezone(tg_id, tz_info["country"], tz_info["timezone"], tz_info["offset"])
+
+        # Show confirmation + welcome
+        confirm_texts = {
+            "uz": f"✅ {tz_info['country']} ({tz_info['timezone']}) tanlandi!",
+            "ru": f"✅ {tz_info['country']} ({tz_info['timezone']}) выбрано!",
+            "en": f"✅ {tz_info['country']} ({tz_info['timezone']}) selected!",
+        }
+        await query.edit_message_text(confirm_texts.get(lang, confirm_texts["uz"]))
+
+        # Send welcome message as a new message
+        voice_messages = {
+            "uz": "Assalomu aleykum!\n🎤 Ovozli xabarlar orqali ham muloqot qilishimiz mumkin, faqat aniq gapirsangiz bas.\n\n📅 Reja tuzish uchun: /plan\n📊 Statistika va jarayonlar uchun: /web\n📱 Mini ilovaga kirish uchun: /app\n🌐 Tilni o'zgartirish uchun: /language",
+            "ru": "Здравствуйте!\n🎤 Мы можем общаться голосовыми сообщениями, просто говорите чётко.\n\n📅 Создать план: /plan\n📊 Статистика и процессы: /web\n📱 Открыть мини-приложение: /app\n🌐 Изменить язык: /language",
+            "en": "Hello!\n🎤 We can also communicate via voice messages, just speak clearly.\n\n📅 To create a plan: /plan\n📊 For statistics and progress: /web\n📱 To open the mini-app: /app\n🌐 To change language: /language"
+        }
+        voice_text = voice_messages.get(lang, voice_messages["en"])
+        await query.message.reply_text(voice_text)
+
+    except Exception as e:
+        logging.exception("timezone_callback error: %s", e)
+        try:
+            if update.callback_query and update.callback_query.message:
+                await update.callback_query.message.reply_text("An error occurred.")
+        except Exception:
+            pass
+
+
+async def handle_custom_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Handle user typing a custom country name for timezone detection.
+    Returns True if this handler consumed the message, False otherwise."""
+    try:
+        user = update.effective_user
+        if not user or not update.message:
+            return False
+        
+        tg_id = user.id
+        state_doc = await get_state(tg_id)
+        
+        if state_doc.get("state") != "awaiting_custom_timezone":
+            return False
+        
+        country_name = (update.message.text or "").strip()
+        if not country_name:
+            return False
+        
+        db_user = await get_user_by_telegram_id(tg_id)
+        lang = db_user.get("language", "uz") if db_user else "uz"
+
+        # Use AI to detect timezone offset
+        processing_texts = {
+            "uz": "⏳ Aniqlanmoqda...",
+            "ru": "⏳ Определяю...",
+            "en": "⏳ Detecting...",
+        }
+        wait_msg = await update.message.reply_text(processing_texts.get(lang, processing_texts["uz"]))
+
+        try:
+            from bot.services.ai import call_groq
+            prompt = f"""User says their country is: "{country_name}"
+
+Detect the most common UTC timezone offset for this country.
+Return ONLY a valid JSON object, nothing else:
+{{"country": "official country name", "timezone": "UTC+X or UTC-X", "offset": integer_offset}}
+
+Examples:
+- Japan → {{"country": "Japan", "timezone": "UTC+9", "offset": 9}}
+- Germany → {{"country": "Germany", "timezone": "UTC+1", "offset": 1}}
+- Brazil → {{"country": "Brazil", "timezone": "UTC-3", "offset": -3}}
+- UAE → {{"country": "UAE", "timezone": "UTC+4", "offset": 4}}
+
+If the country name is misspelled, fix it. If truly unrecognizable, return:
+{{"country": "Unknown", "timezone": "UTC+0", "offset": 0}}"""
+
+            ai_result = await call_groq(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=100,
+            )
+
+            import json, re
+            ai_result = ai_result.replace("```json", "").replace("```", "").strip()
+            match = re.search(r"\{.*?\}", ai_result, re.DOTALL)
+            if match:
+                parsed = json.loads(match.group(0))
+                country = parsed.get("country", country_name)
+                tz_str = parsed.get("timezone", "UTC+0")
+                offset = int(parsed.get("offset", 0))
+                
+                await set_timezone(tg_id, country, tz_str, offset)
+                await clear_state(tg_id)
+
+                confirm_texts = {
+                    "uz": f"✅ {country} ({tz_str}) tanlandi!",
+                    "ru": f"✅ {country} ({tz_str}) выбрано!",
+                    "en": f"✅ {country} ({tz_str}) selected!",
+                }
+                await wait_msg.edit_text(confirm_texts.get(lang, confirm_texts["uz"]))
+
+                # Send welcome message
+                voice_messages = {
+                    "uz": "Assalomu aleykum!\n🎤 Ovozli xabarlar orqali ham muloqot qilishimiz mumkin, faqat aniq gapirsangiz bas.\n\n📅 Reja tuzish uchun: /plan\n📊 Statistika va jarayonlar uchun: /web\n📱 Mini ilovaga kirish uchun: /app\n🌐 Tilni o'zgartirish uchun: /language",
+                    "ru": "Здравствуйте!\n🎤 Мы можем общаться голосовыми сообщениями, просто говорите чётко.\n\n📅 Создать план: /plan\n📊 Статистика и процессы: /web\n📱 Открыть мини-приложение: /app\n🌐 Изменить язык: /language",
+                    "en": "Hello!\n🎤 We can also communicate via voice messages, just speak clearly.\n\n📅 To create a plan: /plan\n📊 For statistics and progress: /web\n📱 To open the mini-app: /app\n🌐 To change language: /language"
+                }
+                voice_text = voice_messages.get(lang, voice_messages["en"])
+                await update.message.reply_text(voice_text)
+                return True
+            else:
+                raise ValueError("No JSON found in AI response")
+
+        except Exception as ai_err:
+            logging.exception("AI timezone detection error: %s", ai_err)
+            # Fallback: save with UTC+0 and let user know
+            await set_timezone(tg_id, country_name, "UTC+0", 0)
+            await clear_state(tg_id)
+            
+            fallback_texts = {
+                "uz": f"⚠️ \"{country_name}\" uchun aniq vaqt zonasi topilmadi. UTC+0 sifatida saqlandi.\nSozlamalarda o'zgartirish mumkin.",
+                "ru": f"⚠️ Не удалось определить часовой пояс для \"{country_name}\". Сохранено как UTC+0.\nМожно изменить в настройках.",
+                "en": f"⚠️ Couldn't detect timezone for \"{country_name}\". Saved as UTC+0.\nYou can change it in settings.",
+            }
+            await wait_msg.edit_text(fallback_texts.get(lang, fallback_texts["uz"]))
+
+            voice_messages = {
+                "uz": "📅 Reja tuzish uchun: /plan\n📱 Mini ilovaga kirish uchun: /app",
+                "ru": "📅 Создать план: /plan\n📱 Открыть мини-приложение: /app",
+                "en": "📅 To create a plan: /plan\n📱 To open the mini-app: /app"
+            }
+            await update.message.reply_text(voice_messages.get(lang, voice_messages["uz"]))
+            return True
+
+    except Exception as e:
+        logging.exception("handle_custom_timezone error: %s", e)
+        return True
+
 
 async def web_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
@@ -206,4 +413,3 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         logging.exception("language_command error: %s", e)
         if update.message:
             await update.message.reply_text("Biroz xatolik yuz berdi :(")
-

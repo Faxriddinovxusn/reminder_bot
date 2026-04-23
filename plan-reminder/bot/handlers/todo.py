@@ -10,7 +10,7 @@ from bson import ObjectId
 
 from bot.models.task import create_task, get_tasks_for_user_on_date, mark_task_done, create_scheduled_task, update_task_reminder_offset
 from bot.models.state import get_state, set_state, clear_state
-from bot.models.user import get_user_by_telegram_id, get_subscription_status
+from bot.models.user import get_user_by_telegram_id, get_subscription_status, get_user_tz
 from bot.messages import messages
 from bot.services.ai import get_ai_response, extract_tasks_from_schedule, extract_tasks_from_text, generate_summary
 from bot.services.db import get_db
@@ -580,8 +580,9 @@ async def plan_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await query.edit_message_text(msgs.get(lang, msgs["uz"]))
             return
 
-        tashkent_now = datetime.now(timezone(timedelta(hours=5)))
-        today_local = tashkent_now.date()
+        user_tz = get_user_tz(user)
+        user_now = datetime.now(user_tz)
+        today_local = user_now.date()
         target_dates = []
         days_to_add = 7 if plan_type == "weekly" else 1
             
@@ -662,11 +663,12 @@ async def handle_postpone_input(update: Update, context: ContextTypes.DEFAULT_TY
             return True
 
         user_message = update.message.text or ""
-        tashkent = timezone(timedelta(hours=5))
-        now_tashkent = datetime.now(tashkent)
+        user_tz = get_user_tz(user)
+        tz_offset = int(user.get("timezone_offset", 5) or 5)
+        now_local = datetime.now(user_tz)
         
-        prompt = f"User wants to postpone a task. Current time: {now_tashkent.strftime('%H:%M')}. User said: '{user_message}'. Return ONLY a JSON string with 'time' in HH:MM format. Example: {{\"time\": \"15:30\"}}. If no time found, return {{\"time\": null}}."
-        ai_result = await get_ai_response(prompt, "en", [])
+        prompt = f"User wants to postpone a task. Current time: {now_local.strftime('%H:%M')}. User said: '{user_message}'. Return ONLY a JSON string with 'time' in HH:MM format. Example: {{\"time\": \"15:30\"}}. If no time found, return {{\"time\": null}}."
+        ai_result = await get_ai_response(prompt, "en", [], timezone_offset=tz_offset)
         
         import json, re
         match = re.search(r"\{.*?\}", ai_result[0] if isinstance(ai_result, tuple) else ai_result, re.DOTALL)
@@ -676,7 +678,7 @@ async def handle_postpone_input(update: Update, context: ContextTypes.DEFAULT_TY
                 new_time = parsed.get("time")
                 if new_time:
                     time_obj = datetime.strptime(new_time, "%H:%M").time()
-                    scheduled_dt = datetime.combine(now_tashkent.date(), time_obj).replace(tzinfo=tashkent)
+                    scheduled_dt = datetime.combine(now_local.date(), time_obj).replace(tzinfo=user_tz)
                     scheduled_utc = scheduled_dt.astimezone(timezone.utc).replace(tzinfo=None)
                     
                     if scheduled_utc <= datetime.utcnow():
@@ -873,8 +875,10 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Inject today's tasks so AI knows full context seamlessly
         from bot.services.db import get_db
         db_conn = get_db()
-        tashkent_now = datetime.now(timezone(timedelta(hours=5)))
-        today_date_str = tashkent_now.date().isoformat()
+        user_tz = get_user_tz(db_user)
+        tz_offset = int(db_user.get("timezone_offset", 5) or 5)
+        user_now = datetime.now(user_tz)
+        today_date_str = user_now.date().isoformat()
         today_tasks_cur = db_conn.tasks.find({"telegram_id": tg_id, "date": today_date_str, "status": {"$ne": "deleted"}})
         t_tasks = []
         async for t in today_tasks_cur:
@@ -912,7 +916,7 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         if current_state == "awaiting_monthly_input":
             from bot.services.ai import extract_monthly_dates_and_tasks
-            monthly_dict = await extract_monthly_dates_and_tasks(user_message, lang)
+            monthly_dict = await extract_monthly_dates_and_tasks(user_message, lang, timezone_offset=tz_offset)
             if monthly_dict:
                 sorted_dates = sorted(monthly_dict.keys())
                 first_date = sorted_dates[0]
@@ -944,7 +948,7 @@ async def ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "building_date": state_doc.get("target_date"),
             "is_admin": is_admin_user,
         }
-        ai_result = await get_ai_response(user_message_to_ai, lang, history, user_profile=user_profile)
+        ai_result = await get_ai_response(user_message_to_ai, lang, history, user_profile=user_profile, timezone_offset=tz_offset)
         if isinstance(ai_result, tuple):
             ai_response, profile_updates = ai_result
         else:

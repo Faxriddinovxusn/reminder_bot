@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 import logging
 
@@ -13,6 +13,51 @@ def calculate_segment(interaction_count: int) -> str:
         return "active"
     else:
         return "power_user"
+
+
+def get_user_tz(user_doc: Optional[Dict[str, Any]] = None) -> timezone:
+    """Return a timezone object from the user's timezone_offset field.
+    Defaults to UTC+5 (Tashkent) if not set."""
+    offset = 5  # default
+    if user_doc:
+        try:
+            offset = int(user_doc.get("timezone_offset", 5) or 5)
+        except (ValueError, TypeError):
+            offset = 5
+    return timezone(timedelta(hours=offset))
+
+
+def get_user_tz_offset_str(user_doc: Optional[Dict[str, Any]] = None) -> str:
+    """Return a string like 'UTC+5' or 'UTC-5' from the user's timezone_offset."""
+    offset = 5
+    if user_doc:
+        try:
+            offset = int(user_doc.get("timezone_offset", 5) or 5)
+        except (ValueError, TypeError):
+            offset = 5
+    if offset >= 0:
+        return f"UTC+{offset}"
+    else:
+        return f"UTC{offset}"
+
+
+async def set_timezone(telegram_id: int, country: str, timezone_str: str, timezone_offset: int) -> Optional[Dict[str, Any]]:
+    """Save user's timezone info to DB."""
+    try:
+        db = get_db()
+        await db[USERS_COLL].update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {
+                "country": country,
+                "timezone": timezone_str,
+                "timezone_offset": timezone_offset,
+            }}
+        )
+        return await get_user_by_telegram_id(telegram_id)
+    except Exception as e:
+        logging.exception("set_timezone error: %s", e)
+        raise
+
 
 async def log_command_to_history(telegram_id: int, command: str, bot_reply: str) -> None:
     db = get_db()
@@ -41,6 +86,14 @@ async def ensure_user_profile_fields(
 
         now = datetime.utcnow()
         updates: Dict[str, Any] = {}
+
+        # Backfill timezone fields for existing users
+        if not user.get("timezone_offset") and user.get("timezone_offset") != 0:
+            updates["timezone_offset"] = 5
+        if not user.get("timezone"):
+            updates["timezone"] = "UTC+5"
+        if not user.get("country"):
+            updates["country"] = "O'zbekiston"
 
         if not isinstance(user.get("personality"), dict):
             updates["personality"] = {}
@@ -99,6 +152,9 @@ async def create_user(telegram_id: int, username: Optional[str] = None, language
             "segment": "new",
             "communication_style": "unknown",
             "habits": [],
+            "country": "O'zbekiston",
+            "timezone": "UTC+5",
+            "timezone_offset": 5,
         }
         await db[USERS_COLL].update_one({"telegram_id": telegram_id}, {"$setOnInsert": user_doc}, upsert=True)
         return await ensure_user_profile_fields(telegram_id, username=username, language=language)

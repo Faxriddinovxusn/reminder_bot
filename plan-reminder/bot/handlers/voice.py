@@ -141,7 +141,8 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         if current_state == "awaiting_monthly_input":
             from bot.services.ai import extract_monthly_dates_and_tasks
-            monthly_dict = await extract_monthly_dates_and_tasks(transcribed_text, lang)
+            tz_offset = int(db_user.get("timezone_offset", 5) or 5)
+            monthly_dict = await extract_monthly_dates_and_tasks(transcribed_text, lang, timezone_offset=tz_offset)
             if monthly_dict:
                 sorted_dates = sorted(monthly_dict.keys())
                 first_date = sorted_dates[0]
@@ -177,7 +178,8 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             "is_admin": is_admin_user,
         }
         
-        response_data = await get_ai_response(transcribed_text, lang, history, user_profile)
+        tz_offset = int(db_user.get("timezone_offset", 5) or 5)
+        response_data = await get_ai_response(transcribed_text, lang, history, user_profile, timezone_offset=tz_offset)
         ai_response = response_data[0] if isinstance(response_data, tuple) else response_data
         
         # Update history with new messages

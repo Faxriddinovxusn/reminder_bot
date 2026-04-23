@@ -15,7 +15,7 @@ let pollTimer = null;
 
 // Chart instances
 let weeklyChart = null, priorityChart = null, trendChart = null;
-let admSegChart = null, admLangChart = null, admHourlyChart = null, admDailyChart = null;
+let admSegChart = null, admLangChart = null, admHourlyChart = null, admDailyChart = null, admGeoChart = null;
 
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
@@ -426,14 +426,16 @@ async function sendUserChat() {
 // ==================== ADMIN: DATA LOADING ====================
 async function loadAdminAll() {
     try {
-        const [dash, analytics, system] = await Promise.all([
+        const [dash, analytics, system, geo] = await Promise.all([
             api('/api/admin/dashboard'),
             api('/api/admin/analytics'),
-            api('/api/admin/system')
+            api('/api/admin/system'),
+            api('/api/admin/geography')
         ]);
         renderAdminDashboard(dash);
         renderAdminAnalytics(analytics);
         renderAdminSystem(system);
+        renderAdminGeography(geo);
     } catch (e) {
         console.error('Admin load error:', e);
     }
@@ -635,6 +637,53 @@ function renderAdminAnalytics(a) {
             <td><span class="badge ${segmentBadgeClass(u.segment)}">${segmentLabel(u.segment)}</span></td>
         </tr>
     `).join('');
+}
+
+function renderAdminGeography(geoData) {
+    const geoCtx = document.getElementById('adm-geo-chart');
+    if (!geoCtx) return;
+    
+    if (admGeoChart) admGeoChart.destroy();
+    
+    if (!geoData || geoData.length === 0) {
+        document.getElementById('adm-geo-labels').innerHTML = '<span style="color:var(--text-tertiary)">Ma\'lumot topilmadi</span>';
+        return;
+    }
+
+    const labels = geoData.map(g => `${g.flag} ${g.country}`);
+    const data = geoData.map(g => g.count);
+    const bgColors = ['#007aff', '#34c759', '#ff9500', '#af52de', '#ff3b30', '#5ac8fa', '#4cd964', '#ffcc00', '#5856d6', '#ff2d55'];
+    
+    admGeoChart = new Chart(geoCtx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Foydalanuvchilar',
+                data: data,
+                backgroundColor: bgColors.slice(0, data.length),
+                borderRadius: 4,
+                barPercentage: 0.6
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { beginAtZero: true, grid: { color: 'rgba(128,128,128,0.08)' }, ticks: { font: { size: 11 } } },
+                y: { grid: { display: false }, ticks: { font: { size: 12, weight: 'bold' } } }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+
+    const labelsContainer = document.getElementById('adm-geo-labels');
+    labelsContainer.innerHTML = geoData.map(g => 
+        `<div><span style="font-size:16px;">${g.flag}</span> <strong>${escapeHtml(g.country)}</strong> — ${g.count} ta <span style="color:var(--text-tertiary);">(${g.percentage}%)</span></div>`
+    ).join('');
 }
 
 // ==================== ADMIN: SYSTEM ====================

@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <script>
-    window.onerror = function(msg, src, line, col, err) {
-        document.body.innerHTML += '<div style="background:red;color:white;padding:10px;font-size:12px;position:fixed;top:0;left:0;right:0;z-index:9999">' + msg + ' (line ' + line + ')</div>';
-        return false;
-    };
+        window.onerror = function (msg, src, line, col, err) {
+            document.body.innerHTML += '<div style="background:red;color:white;padding:10px;font-size:12px;position:fixed;top:0;left:0;right:0;z-index:9999">' + msg + ' (line ' + line + ')</div>';
+            return false;
+        };
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,6 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="app-container">
         <!-- Header -->
@@ -25,7 +27,8 @@
         </header>
 
         <!-- Offline Banner -->
-        <div id="offlineBanner" style="display: none; background-color: #fef2f2; color: #dc2626; padding: 8px; text-align: center; font-size: 14px; font-weight: 500; border-bottom: 1px solid #fee2e2; transition: all 0.3s ease;">
+        <div id="offlineBanner"
+            style="display: none; background-color: #fef2f2; color: #dc2626; padding: 8px; text-align: center; font-size: 14px; font-weight: 500; border-bottom: 1px solid #fee2e2; transition: all 0.3s ease;">
             Offline rejim 📴
         </div>
 
@@ -44,12 +47,7 @@
             <!-- Tasks Tab -->
             <div class="tab-content active" id="tasksTab">
                 <div class="input-group">
-                    <input 
-                        type="text" 
-                        id="taskInput" 
-                        placeholder="Add new task..." 
-                        class="task-input"
-                    >
+                    <input type="text" id="taskInput" placeholder="Add new task..." class="task-input">
                     <button id="addTaskBtn" class="btn-primary">+</button>
                 </div>
 
@@ -174,17 +172,8 @@
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <input 
-                    type="text" 
-                    id="noteTitleInput" 
-                    placeholder="Note title" 
-                    class="note-title-input"
-                >
-                <textarea 
-                    id="noteContentInput" 
-                    placeholder="Note content..." 
-                    class="note-content-input"
-                ></textarea>
+                <input type="text" id="noteTitleInput" placeholder="Note title" class="note-title-input">
+                <textarea id="noteContentInput" placeholder="Note content..." class="note-content-input"></textarea>
                 <button id="saveNoteBtn" class="btn-primary">Save</button>
             </div>
         </div>
@@ -210,12 +199,7 @@
         </div>
         <div class="ai-input-group">
             <button class="ai-voice-btn" id="aiVoiceBtn" title="Voice input">🎤</button>
-            <input 
-                type="text" 
-                id="aiInput" 
-                placeholder="Ask me about your tasks..."
-                class="ai-input"
-            >
+            <input type="text" id="aiInput" placeholder="Ask me about your tasks..." class="ai-input">
             <button class="ai-send-btn" id="aiSendBtn">Send</button>
         </div>
     </div>
@@ -250,4 +234,5 @@
         });
     </script>
 </body>
+
 </html>

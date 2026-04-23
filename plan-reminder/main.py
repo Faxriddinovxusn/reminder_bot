@@ -16,19 +16,14 @@ from bot.services.db import connect, get_db, close
 from bot.models.user import create_user, get_user_by_telegram_id, set_language, ensure_indexes, get_subscription_status
 from bot.models.task import create_task, get_tasks_for_user_on_date, mark_task_done
 from bot.services.ai import generate_summary
-from bot.handlers.start import start, language_callback, web_command, app_command, free_command, language_command
+from bot.handlers.start import start, language_callback, timezone_callback, handle_custom_timezone, web_command, app_command, free_command, language_command
 from bot.handlers.todo import (
     plan_command, add_command, tasks_command, done_callback, ai_chat, 
     reminder_preference_callback, confirm_plan_callback, reminder_choice_callback, task_status_callback, plan_type_callback
 )
 from bot.handlers.admin import (
-    users_command as admin_users, 
-    user_detail_command as admin_user_detail, 
-    admin_segment, admin_custdev, admin_stats, 
     admin_add_admin, admin_remove_admin, admin_promo,
-    admin_free_all, admin_paid_all, admin_change_price,
-    admin_free_user, admin_paid_user, admin_help,
-    admin_see, admin_send, admin_cancel
+    admin_help, admin_send, admin_cancel
 )
 from bot.handlers.custdev import admin_custdev_create, admin_custdev_send, custdev_response_handler
 from bot.handlers.payment import payment_screenshot_handler, payment_callback
@@ -159,8 +154,9 @@ async def check_reminders(application) -> None:
                         continue
                     
                     lang = user.get("language", "uz")
-                    tashkent = timezone(timedelta(hours=5))
-                    task_time_str = scheduled.astimezone(tashkent).strftime("%H:%M")
+                    user_offset = int(user.get("timezone_offset", 5) or 5)
+                    user_tz = timezone(timedelta(hours=user_offset))
+                    task_time_str = scheduled.astimezone(user_tz).strftime("%H:%M")
                     
                     motivations = {
                         "uz": ["Olg'a! Siz buni eplaysiz!", "Harakatdan to'xtamang!", "Yana bir qadam oldinga!", "Bugun sizning kuningiz!"],
@@ -185,9 +181,6 @@ async def check_reminders(application) -> None:
 
 async def send_evening_report(application) -> None:
     try:
-        tashkent = timezone(timedelta(hours=5))
-        now_local = datetime.now(tashkent)
-        today = now_local.date()
         db = get_db()
 
         users = await db.users.find({}).to_list(length=1000)
@@ -195,6 +188,16 @@ async def send_evening_report(application) -> None:
             try:
                 telegram_id = user["telegram_id"]
                 lang = user.get("language", "uz")
+                
+                user_offset = int(user.get("timezone_offset", 5) or 5)
+                user_tz = timezone(timedelta(hours=user_offset))
+                now_local = datetime.now(user_tz)
+                
+                # Only send if it's ~22:00 in user's local time (21:30–22:30 window)
+                if not (21 <= now_local.hour <= 22):
+                    continue
+                
+                today = now_local.date()
                 web_pin = user.get("web_pin")
                 if not web_pin:
                     import random
@@ -259,9 +262,6 @@ async def send_evening_report(application) -> None:
 
 async def send_weekly_report(application) -> None:
     try:
-        tashkent = timezone(timedelta(hours=5))
-        now_local = datetime.now(tashkent)
-        today = now_local.date()
         db = get_db()
 
         users = await db.users.find({}).to_list(length=1000)
@@ -269,6 +269,11 @@ async def send_weekly_report(application) -> None:
             try:
                 telegram_id = user["telegram_id"]
                 lang = user.get("language", "uz")
+                
+                user_offset = int(user.get("timezone_offset", 5) or 5)
+                user_tz = timezone(timedelta(hours=user_offset))
+                now_local = datetime.now(user_tz)
+                today = now_local.date()
                 
                 status = await get_subscription_status(user)
                 if status == "expired":
@@ -360,10 +365,6 @@ async def send_weekly_report(application) -> None:
 
 async def send_monthly_report(application) -> None:
     try:
-        tashkent = timezone(timedelta(hours=5))
-        now_local = datetime.now(tashkent)
-        today = now_local.date()
-        month_ago = today - timedelta(days=30)
         db = get_db()
 
         users = await db.users.find({}).to_list(length=1000)
@@ -371,6 +372,12 @@ async def send_monthly_report(application) -> None:
             try:
                 telegram_id = user["telegram_id"]
                 lang = user.get("language", "uz")
+                
+                user_offset = int(user.get("timezone_offset", 5) or 5)
+                user_tz = timezone(timedelta(hours=user_offset))
+                now_local = datetime.now(user_tz)
+                today = now_local.date()
+                month_ago = today - timedelta(days=30)
                 
                 status = await get_subscription_status(user)
                 if status == "expired":
@@ -431,13 +438,22 @@ async def send_monthly_report(application) -> None:
 async def create_recurring_tasks(application) -> None:
     try:
         db = get_db()
-        tashkent = timezone(timedelta(hours=5))
-        today = datetime.now(tashkent).date()
-        day_name = today.strftime("%a").lower()
 
         recurring = await db.tasks.find({"is_recurring": True}).to_list(length=1000)
         for template in recurring:
             try:
+                # Look up the task owner's timezone
+                task_user = None
+                if template.get("telegram_id"):
+                    task_user = await db.users.find_one({"telegram_id": template["telegram_id"]})
+                if not task_user and template.get("user_id"):
+                    task_user = await db.users.find_one({"_id": template["user_id"]})
+                
+                user_offset = int((task_user or {}).get("timezone_offset", 5) or 5)
+                user_tz = timezone(timedelta(hours=user_offset))
+                today = datetime.now(user_tz).date()
+                day_name = today.strftime("%a").lower()
+                
                 recur_days = template.get("recur_days", ["mon", "tue", "wed", "thu", "fri", "sat", "sun"])
                 if day_name not in recur_days:
                     continue
@@ -452,7 +468,7 @@ async def create_recurring_tasks(application) -> None:
                     continue
 
                 recur_time = template.get("recur_time", "09:00") or "09:00"
-                local_scheduled = datetime.combine(today, datetime.strptime(recur_time, "%H:%M").time()).replace(tzinfo=tashkent)
+                local_scheduled = datetime.combine(today, datetime.strptime(recur_time, "%H:%M").time()).replace(tzinfo=user_tz)
                 scheduled_utc = local_scheduled.astimezone(timezone.utc).replace(tzinfo=None)
                 reminder_offset = int(template.get("reminder_offset", 10) or 10)
 
@@ -480,7 +496,7 @@ async def create_recurring_tasks(application) -> None:
         logging.exception("create_recurring_tasks error: %s", e)
 
 async def evening_checkin(app) -> None:
-    """Evening check-in: ask users what they accomplished today (21:00 Tashkent / 16:00 UTC)"""
+    """Evening check-in: ask users what they accomplished today (runs every hour, checks user's local time)"""
     try:
         db = get_db()
         users = await db.users.find({}).to_list(length=1000)
@@ -489,6 +505,14 @@ async def evening_checkin(app) -> None:
             try:
                 telegram_id = user["telegram_id"]
                 lang = user.get("language", "uz")
+                user_offset = int(user.get("timezone_offset", 5) or 5)
+                user_tz = timezone(timedelta(hours=user_offset))
+                now_local = datetime.now(user_tz)
+                
+                # Only send if it's ~21:00 in user's local time (20:30–21:30 window)
+                if now_local.hour != 21:
+                    continue
+                
                 now = datetime.utcnow()
 
                 # Skip expired users
@@ -576,26 +600,17 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("plan", plan_command))
     app.add_handler(CommandHandler("add", add_command))
     app.add_handler(CommandHandler("tasks", tasks_command))
-    app.add_handler(CommandHandler("users", admin_users))
-    app.add_handler(CommandHandler("user", admin_user_detail))
-    app.add_handler(CommandHandler("stats", admin_stats))
-    app.add_handler(CommandHandler("addadmin", admin_add_admin))
-    app.add_handler(CommandHandler("removeadmin", admin_remove_admin))
+    app.add_handler(CommandHandler("add_admin", admin_add_admin))
+    app.add_handler(CommandHandler("remove_admin", admin_remove_admin))
     app.add_handler(CommandHandler("promo", admin_promo))
-    app.add_handler(CommandHandler("segment", admin_segment))
-    app.add_handler(CommandHandler("custdev", admin_custdev))
-    app.add_handler(CommandHandler("freeall", admin_free_all))
-    app.add_handler(CommandHandler("paidall", admin_paid_all))
-    app.add_handler(CommandHandler("change_price", admin_change_price))
-    app.add_handler(CommandHandler("freeuserlar", admin_free_user))
-    app.add_handler(CommandHandler("paiduserlar", admin_paid_user))
     app.add_handler(CommandHandler("adminhelp", admin_help))
-    app.add_handler(CommandHandler("see", admin_see))
     app.add_handler(CommandHandler("send", admin_send))
+    app.add_handler(CommandHandler("cancel", admin_cancel))
     
     app.add_handler(CallbackQueryHandler(payment_callback, pattern="^pay_"))
     app.add_handler(CallbackQueryHandler(custdev_response_handler, pattern="^custdev_answer_"))
     app.add_handler(CallbackQueryHandler(language_callback, pattern="^lang_"))
+    app.add_handler(CallbackQueryHandler(timezone_callback, pattern="^tz_"))
     app.add_handler(CallbackQueryHandler(plan_type_callback, pattern="^plan_type_"))
     app.add_handler(CallbackQueryHandler(confirm_plan_callback, pattern="^plan_confirm_"))
     app.add_handler(CallbackQueryHandler(done_callback, pattern="^done_"))
